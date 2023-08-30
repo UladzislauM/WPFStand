@@ -1,0 +1,58 @@
+﻿<Window x:Class="TestStandApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TestStandApp"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="800">
+    <Grid>
+        <Button 
+                x:Name="Test_send"
+                Content="Test" 
+                Click="Test_send_Click" 
+                Margin="23,79,712,325"/>
+        <ComboBox x:Name="serialPortComboBox" 
+                  HorizontalAlignment="Left" 
+                  Margin="23,40,0,0" 
+                  VerticalAlignment="Top" 
+                  Width="150"/>
+        <TextBox x:Name="Entered_command"
+                 HorizontalAlignment="Left"
+                 Margin="235,174,0,0" 
+                 TextWrapping="Wrap"
+                 Text="Enter command" 
+                 VerticalAlignment="Top" 
+                 Width="308" 
+                 Height="28" 
+                 MouseLeftButtonDown="Entered_command_MouseLeftButtonDown"/>
+        <TextBlock HorizontalAlignment="Left" 
+                   Margin="23,10,0,0" 
+                   TextWrapping="Wrap" 
+                   Text="Port:" 
+                   VerticalAlignment="Top" 
+                   Width="150" Height="16"/>
+        <ComboBox x:Name="CommandsBox" 
+            HorizontalAlignment="Left" 
+            Margin="23,174,0,0" 
+            VerticalAlignment="Top" 
+            Width="150"/>
+        <TextBlock HorizontalAlignment="Left" 
+                   Margin="23,142,0,0" 
+                   TextWrapping="Wrap" 
+                   VerticalAlignment="Top" 
+                   Width="150" Height="16">
+                <Run Text="Write command"/>
+                    <LineBreak/>
+                <Run Text=":"/>
+        </TextBlock>
+        <TextBox x:Name="in_data"
+            HorizontalAlignment="Left"
+            Margin="23,217,0,0" 
+            TextWrapping="Wrap"
+            Text="Income data" 
+            VerticalAlignment="Top" 
+            Width="308" 
+            Height="28"/>
+    </Grid>
+</Window>
