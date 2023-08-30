@@ -11,7 +11,7 @@
                 x:Name="Test_send"
                 Content="Test" 
                 Click="Test_send_Click" 
-                Margin="23,79,712,325"/>
+                Margin="23,79,541,297"/>
         <ComboBox x:Name="serialPortComboBox" 
                   HorizontalAlignment="Left" 
                   Margin="23,40,0,0" 
