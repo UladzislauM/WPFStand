@@ -1,0 +1,27 @@
+﻿<Window x:Class="TestStandApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:notifications="clr-namespace:TestStandApp.ViewModels.Notifications" 
+        d:DataContext="{d:DesignInstance Type=notifications:StandViewModel}"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="800">
+    <Grid>
+        <ComboBox ItemsSource="{Binding SerialPortNames}" 
+                  SelectedItem="{Binding SelectedSerialPort}" 
+                  Margin="25,35,506,344"/>
+        <ListBox ItemsSource="{Binding CommandsDictionary}"
+                  DisplayMemberPath="Key"
+                  SelectedValuePath="Key"
+                  SelectedValue="{Binding SelectedCommand}" 
+                  Margin="25,95,400,96"/>
+        <Button Content="Execute Command" 
+                Command="{Binding ExecuteCommand}" 
+                Margin="25,357,588,33"/>
+        <TextBlock Text="{Binding ResultText}" 
+                   Margin="25,275,494,33"/>
+        <TextBox Text="{Binding EnteredCommandText}" 
+                 Margin="418,95,111,284"/>
+    </Grid>
+</Window>

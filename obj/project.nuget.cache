@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "FQiggPvAh4uJfzsZ29tuFLKtBrPtY5LA895igQ4NF80u+1vsRnSr0alH7X3frbAR5H+idFrZO1a1z3EIvPEUkw==",
+  "dgSpecHash": "z5NoEot70qLYgVl4J0gHic1hCvgsk8dQs8jqfaLT+aXfZCqKv/h1tFoW/ZjsM4ElnkqFeHPDhpbFgzq9mW7+nQ==",
   "success": true,
   "projectFilePath": "D:\\ADVIN\\TestStandApp\\TestStandApp.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\Marshalau-PC\\.nuget\\packages\\microsoft.xaml.behaviors.wpf\\1.1.39\\microsoft.xaml.behaviors.wpf.1.1.39.nupkg.sha512",
     "C:\\Users\\Marshalau-PC\\.nuget\\packages\\runtime.linux-arm.runtime.native.system.io.ports\\7.0.0\\runtime.linux-arm.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
     "C:\\Users\\Marshalau-PC\\.nuget\\packages\\runtime.linux-arm64.runtime.native.system.io.ports\\7.0.0\\runtime.linux-arm64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
     "C:\\Users\\Marshalau-PC\\.nuget\\packages\\runtime.linux-x64.runtime.native.system.io.ports\\7.0.0\\runtime.linux-x64.runtime.native.system.io.ports.7.0.0.nupkg.sha512",
