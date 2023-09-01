@@ -7,6 +7,10 @@
         d:DataContext="{d:DesignInstance Type=notifications:StandViewModel}"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
+    <Window.DataContext>
+        <notifications:StandViewModel/>
+    </Window.DataContext>
+    
     <Grid>
         <ComboBox ItemsSource="{Binding SerialPortNames}" 
                   SelectedItem="{Binding SelectedSerialPort}" 
@@ -17,11 +21,11 @@
                   SelectedValue="{Binding SelectedCommand}" 
                   Margin="25,95,400,96"/>
         <Button Content="Execute Command" 
-                Command="{Binding ExecuteCommand}" 
+                Command="{Binding ExecuteCommand}"
                 Margin="25,357,588,33"/>
         <TextBlock Text="{Binding ResultText}" 
-                   Margin="25,275,494,33"/>
-        <TextBox Text="{Binding EnteredCommandText}" 
+                   Margin="418,182,111,183"/>
+        <TextBox Text="{Binding EnteredCommandText}"
                  Margin="418,95,111,284"/>
     </Grid>
 </Window>

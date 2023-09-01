@@ -20,14 +20,26 @@ namespace TestStandApp.ViewModels.Notifications
         private string resultText;
         private string enteredCommandText;
         private string[] portNames;
+        private bool isActiveButton;
+        private string selectedSerialPort;
 
 
         public ObservableCollection<string> serialPortNames = new ObservableCollection<string>();
         private Dictionary<string, string> commandsDictionary = new Dictionary<string, string>();
 
+        public string SelectedSerialPort
+        {
+            get => selectedSerialPort;
+            set
+            {
+                selectedSerialPort = value;
+                OnPropertyChanged("SelectedSerialPort");
+            }
+        }
+
         public ObservableCollection<string> SerialPortNames
         {
-            get { return serialPortNames; }
+            get => serialPortNames;
             set
             {
                 serialPortNames = value;
@@ -35,29 +47,39 @@ namespace TestStandApp.ViewModels.Notifications
             }
         }
 
+        public bool IsActiveButton
+        {
+            get => isActiveButton;
+            set
+            {
+                isActiveButton = value;
+                OnPropertyChanged("isActiveListBox");
+            }
+        }
+
         public string SelectedCommand
         {
-            get { return selectedCommand; }
+            get => selectedCommand;
             set
             {
                 selectedCommand = value;
                 OnPropertyChanged("SelectedCommand");
-                ExecuteCommand.RaiseCanExecuteChanged();
+                IsActiveButton = true;
             }
         }
 
         public string ResultText
         {
-            get { return resultText; }
+            get => resultText = "Resualt";
             set
             {
                 resultText = value;
-                OnPropertyChanged("SelectedCommand");
+                OnPropertyChanged();
             }
         }
         public string EnteredCommandText
         {
-            get { return enteredCommandText; }
+            get => enteredCommandText = "Write command";
             set
             {
                 enteredCommandText = value;
@@ -67,7 +89,7 @@ namespace TestStandApp.ViewModels.Notifications
 
         public Dictionary<string, string> CommandsDictionary
         {
-            get { return commandsDictionary; }
+            get => commandsDictionary;
             set
             {
                 commandsDictionary = value;
@@ -84,23 +106,24 @@ namespace TestStandApp.ViewModels.Notifications
             ExecuteCommand = new SingleCommand(Execute, CanExecute);
         }
 
-        private void Execute(object parameter)
+        public void Execute(object parameter)
         {
-            if (SelectedCommand == null)
+            if (selectedCommand == null)
                 return;
 
-            SerialPort port = new SerialPort(SelectedCommand ?? "Empty port",
+            port = new SerialPort(selectedSerialPort ?? "Empty port",
           19200, Parity.None, 8, StopBits.One);
             try
             {
                 port.Open();
-                byte[] outByteArray = ReadData();
+                byte[] outByteArray = WriteData();
                 port.Write(outByteArray, 0, outByteArray.Length);
 
                 byte[] inData = new byte[port.BytesToRead];
                 port.Read(inData, 0, inData.Length);
 
-                ResultText = ByteArrayToFormattedString(inData);
+                string string16s = ByteArrayToFormattedString(inData);
+                resultText = string16s;
             }
             catch (Exception ex)
             {
@@ -114,7 +137,7 @@ namespace TestStandApp.ViewModels.Notifications
 
         private bool CanExecute(object parameter)
         {
-            return SelectedCommand != null;
+            return selectedCommand != null;
         }
 
         private string ByteArrayToFormattedString(byte[] byteArray)
@@ -126,14 +149,14 @@ namespace TestStandApp.ViewModels.Notifications
                 formattedString += "0x" + b.ToString("X2") + " ";
             }
 
-            return formattedString.Trim();
+            return formattedString;
         }
 
-        private byte[] ReadData()
+        private byte[] WriteData()
         {
-            if (EnteredCommandText.Equals("Enter command") || EnteredCommandText.Equals(" "))
+            if (enteredCommandText.Equals("Write command") || enteredCommandText.Equals(" "))
             {
-                string keysCommands = SelectedCommand ?? "Empty command";
+                string keysCommands = selectedCommand ?? "Empty command";
                 string command = CommandsDictionary[keysCommands];
                 byte[] byteArray = command.Split(' ').Select(s => Convert.ToByte(s, 16)).ToArray();
                 byteArray = byteArray.Concat(new byte[] { CalculateLRC(byteArray) }).ToArray();
@@ -141,7 +164,7 @@ namespace TestStandApp.ViewModels.Notifications
             }
             else
             {
-                string input = EnteredCommandText;
+                string input = enteredCommandText;
                 byte[] byteArray = input.Split(' ').Select(s => Convert.ToByte(s, 16)).ToArray();
                 return byteArray;
             }
@@ -162,8 +185,10 @@ namespace TestStandApp.ViewModels.Notifications
             {
                 { "Scan", "0xDC 0x04 0x28 0x02 0x058" },
                 { "Starting position", "0xDC 0x02 0x2D" },
-                { "Run with 200 speed", "0xDC 0x04 0x01 0x02 0x00" },
+                { "Working stroke of the platform with 200 speed", "0xDC 0x04 0x01 0x00 0xC8" },
+                { "Platform reverse with 600 speed", "0xDC 0x04 0x02 0x02 0x58" },
                 { "Light on", "0xDC 0x04 0x03 0x01 0x00" },
+                { "Light off", "0xDC 0x04 0x04 0x01 0x00" },
                 { "Status", "0xDC 0x02 0x0B" },
                 { "Exceptions?", "0xDC 0x02 0x0A" }
             };
@@ -171,12 +196,14 @@ namespace TestStandApp.ViewModels.Notifications
 
         private byte CalculateLRC(byte[] data)
         {
-            byte lrc = 0x00;
-            foreach (byte b in data)
+            int sum = 0;
+            for (int i = 0; i < data.Length; i++)
             {
-                lrc ^= b;
+                sum -= data[i];
             }
-            return lrc;
+            byte crc = (byte)(sum);
+
+            return crc;
         }
     }
 

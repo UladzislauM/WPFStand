@@ -9,7 +9,7 @@ namespace TestStandApp.Models
 {
     class ComModel
     {
-        private string id { get; set; }
-        private string data { get; set; }
+        private string? id { get; set; }
+        private string? data { get; set; }
     }
 }
