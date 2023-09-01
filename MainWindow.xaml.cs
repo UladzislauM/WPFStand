@@ -97,6 +97,7 @@ namespace TestStandApp
                 { "Scan", "0xDC 0x04 0x28 0x02 0x058" },
                 { "Starting position", "0xDC 0x02 0x2D" },
                 { "Run with 200 speed", "0xDC 0x04 0x01 0x02 0x00" },
+                { "Run with 0 speed", "0xDC 0x04 0x02 0x00 0x00" },
                 { "Light on", "0xDC 0x04 0x03 0x01 0x00" },
                 { "Status", "0xDC 0x02 0x0B" },
                 { "Exceptions?", "0xDC 0x02 0x0A" }
@@ -105,12 +106,14 @@ namespace TestStandApp
 
         private byte CalculateLRC(byte[] data)
         {
-            byte lrc = 0x00;
-            foreach (byte b in data)
+            int sum = 0;
+            for (int i = 0; i < data.Length; i++)
             {
-                lrc ^= b;
+                sum -= data[i];
             }
-            return lrc;
+            byte crc = (byte)(sum);
+
+            return crc;
         }
 
         private void AddDataToComboBox()
