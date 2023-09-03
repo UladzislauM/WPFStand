@@ -12,6 +12,10 @@
     </Window.DataContext>
     
     <Grid>
+        <ToggleButton Name="toggleButton" 
+                      Content="{Binding CicleCommand}" 
+                      IsChecked="{Binding CicleCommand}"
+                      Margin="239,357,382,33" />
         <ComboBox ItemsSource="{Binding SerialPortNames}" 
                   SelectedItem="{Binding SelectedSerialPort}" 
                   Margin="25,35,506,344"/>
@@ -27,5 +31,10 @@
                    Margin="418,182,111,183"/>
         <TextBox Text="{Binding EnteredCommandText}"
                  Margin="418,95,111,284"/>
+        <ToggleButton x:Name="openPort" 
+            Content="{Binding OpenPort}" 
+            IsChecked="{Binding OpenPort}"
+            Margin="328,35,292,355" />
+
     </Grid>
 </Window>
