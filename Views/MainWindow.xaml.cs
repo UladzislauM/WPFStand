@@ -11,12 +11,19 @@ namespace TestStandApp
 {
     public partial class MainWindow : Window
     {
+        private StandViewModel viewModel;
+
         public MainWindow()
         {
             InitializeComponent();
-            StandViewModel viewModel = new StandViewModel();
+            viewModel = new StandViewModel();
             DataContext = viewModel;
-           
+            Closed += MainWindow_Closed;
+        }
+
+        private void MainWindow_Closed(object sender, EventArgs e)
+        {
+            viewModel.ClosePort();
         }
     }
 }
