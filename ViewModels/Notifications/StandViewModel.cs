@@ -63,7 +63,7 @@ namespace TestStandApp.ViewModels.Notifications
                 _cicleCommand = value;
                 OnPropertyChanged(nameof(CicleCommand));
                 ChangeButton();
-                RunLineProgram();
+                StartRunLineProgramThread();
             }
         }
 
@@ -181,6 +181,13 @@ namespace TestStandApp.ViewModels.Notifications
             }
         }
 
+        private void StartRunLineProgramThread()
+        {
+            Thread standLineStartThreed = new Thread(RunLineProgram);
+
+            standLineStartThreed.Start();
+        }
+
         private void RunLineProgram()
         {
             byte[] statusByteArray = new byte[] { 220, 2, 11, 23 };
@@ -222,7 +229,7 @@ namespace TestStandApp.ViewModels.Notifications
                 CurtainOnOff(false);
 
                 isKeyHold = false;
-                _cicleCommand = false;
+                ChangeButton();
             }
         }
 
