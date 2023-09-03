@@ -20,10 +20,10 @@
                   SelectedItem="{Binding SelectedSerialPort}" 
                   Margin="25,35,506,344"/>
         <ListBox ItemsSource="{Binding CommandsDictionary}"
-                  DisplayMemberPath="Key"
-                  SelectedValuePath="Key"
-                  SelectedValue="{Binding SelectedCommand}" 
-                  Margin="25,95,400,96"/>
+                 DisplayMemberPath="Key"
+                 SelectedValuePath="Key"
+                 SelectedValue="{Binding SelectedCommand}" 
+                 Margin="25,95,400,96"/>
         <Button Content="Execute Command" 
                 Command="{Binding ExecuteCommand}"
                 Margin="25,357,588,33"/>
