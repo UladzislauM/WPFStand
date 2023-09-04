@@ -18,8 +18,10 @@ namespace TestStandApp.ViewModels.Notifications
     internal class StandViewModel : MainViewModel
     {
         private const int MillisecondsTimeout = 1000;
-        private const int QualityTryLineProgram = 10;
+        private const int QualityTryLineProgram = 1000;
         private const int QuantityTryPortRead = 6;
+        private const int TimeoutRewersePlatform = 4000;
+        private const int TimeoutRunPlatform = 5000;
         private string _filePath = @"C:\LogsStandTest.txt";
         private string _testFilePath = @"C:\LogsStandTestTest.txt";
         private SerialPort _port;
@@ -27,8 +29,8 @@ namespace TestStandApp.ViewModels.Notifications
         private string _resultText;
         private string _enteredCommandText;
         private string[] _portNames;
-        private bool _isActiveButton;
         private string _selectedSerialPort;
+        private bool _isActiveButton;
         private bool _cicleCommand;
         private bool _openPort;
 
@@ -49,9 +51,10 @@ namespace TestStandApp.ViewModels.Notifications
             set
             {
                 _openPort = value;
-                OnPropertyChanged(nameof(OpenPort));
+                OnPropertyChanged("OpenPort");
                 ChangeButton();
                 OpenPortForProgram();
+                CheckStatement();
             }
         }
 
@@ -61,7 +64,7 @@ namespace TestStandApp.ViewModels.Notifications
             set
             {
                 _cicleCommand = value;
-                OnPropertyChanged(nameof(CicleCommand));
+                OnPropertyChanged("CicleCommand");
                 ChangeButton();
                 StartRunLineProgramThread();
             }
@@ -73,7 +76,7 @@ namespace TestStandApp.ViewModels.Notifications
             set
             {
                 _selectedSerialPort = value;
-                OnPropertyChanged(nameof(SelectedSerialPort));
+                OnPropertyChanged("SelectedSerialPort");
             }
         }
 
@@ -83,7 +86,7 @@ namespace TestStandApp.ViewModels.Notifications
             set
             {
                 _serialPortNames = value;
-                OnPropertyChanged("SerialPortNames"); //Fix
+                OnPropertyChanged("SerialPortNames");
             }
         }
 
@@ -114,7 +117,7 @@ namespace TestStandApp.ViewModels.Notifications
             set
             {
                 _resultText = value;
-                OnPropertyChanged();
+                OnPropertyChanged("ResultText");
             }
         }
         public string EnteredCommandText
@@ -172,6 +175,44 @@ namespace TestStandApp.ViewModels.Notifications
             }
         }
 
+        private void CheckStatement()
+        {
+            if (!_port.IsOpen)
+            {
+                MessageBox.Show("Exxx: The port is closet or lost!");
+            }
+            else
+            {
+                byte[] exceptionsCommandArray = DictinaryToTheCommand("Exceptions?");
+                byte[] exceptionsByteArray = RunCommand(exceptionsCommandArray, _filePath);
+
+                for (byte i = 3; i < 7; i++)
+                {
+
+                    char[] exceptionBites = ByteForBite(exceptionsByteArray, i);
+
+                    for (byte k = 0; k < 7; k++)
+                    {
+                        if (exceptionBites[k].Equals('1'))
+                        {
+                            MessageBox.Show("Exxx: There is exception with equipment - lets see logs!");
+                        }
+                    }
+                }
+
+                byte[] statusByteArray = DictinaryToTheCommand("Status");
+
+                byte[] testInData = RunCommand(statusByteArray, _testFilePath);
+                char[] biteMask = ByteForBite(testInData, 4);
+
+                if (!biteMask[0].Equals('1'))
+                {
+                    MessageBox.Show("Exxx: The platform situated on different place!");
+                }
+
+            }
+        }
+
         public void ClosePort()
         {
             if (_port != null && _port.IsOpen)
@@ -190,8 +231,8 @@ namespace TestStandApp.ViewModels.Notifications
 
         private void RunLineProgram()
         {
-            byte[] statusByteArray = new byte[] { 220, 2, 11, 23 };
-            bool isKeyHold = false;
+            byte[] statusByteArray = DictinaryToTheCommand("Status");
+            bool permissionForRun = false;
             byte check = 0;
 
             while (_cicleCommand)
@@ -202,34 +243,60 @@ namespace TestStandApp.ViewModels.Notifications
                 }
 
                 byte[] testInData = RunCommand(statusByteArray, _testFilePath);
+                char[] biteMask = ByteForBite(testInData, 3);
 
-                byte testByte = testInData[3];
-                char[] biteMask = new char[8];
-                for (int i = 0; i < 8; i++)
+                if (biteMask[5].Equals('1'))
                 {
-                    biteMask[i] = (testByte & (1 << i)) == 0 ? '0' : '1';
-                }
-
-                if (biteMask[1].Equals('1'))
-                {
-                    isKeyHold = true;
+                    permissionForRun = true;
                     break;
                 }
                 check++;
             }
 
-            if (isKeyHold)//check each time
+            if (permissionForRun)//check each time
             {
-                CurtainOnOff(true);
+                try
+                {
+                    CurtainOnOff(true);
 
-                RunPlatform(true);
+                    RunPlatform(true);
 
-                RunPlatform(false);
+                    CurtainOnOff(false);
 
-                CurtainOnOff(false);
+                    RunPlatform(false);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Exxx: Something went wrong...");
+                }
+                finally
+                {
+                    CurtainOnOff(false);
+                    _cicleCommand = false;
+                    permissionForRun = false;
+                    ChangeButton();
+                }
+            }
+        }
 
-                isKeyHold = false;
-                ChangeButton();
+        private static char[] ByteForBite(byte[] testInData, byte testByteNumber)
+        {
+            if (testByteNumber <= testInData.Length)
+            {
+                byte testByte = testInData[testByteNumber];
+                char[] biteMask = new char[8];
+
+                for (int i = 0; i < 8; i++)
+                {
+                    biteMask[i] = (testByte & (1 << i)) == 0 ? '0' : '1';
+                }
+
+                return biteMask;
+            }
+            else
+            {
+                MessageBox.Show("Exxx: check number more than array lenth!");
+                throw new Exception("Exxx: check number more than array lenth!");
             }
         }
 
@@ -247,22 +314,19 @@ namespace TestStandApp.ViewModels.Notifications
             }
 
             byte[] executedCommand = RunCommand(curtain, _testFilePath);
+            char[] biteMask = ByteForBite(executedCommand, 2);
 
-            byte testByte = executedCommand[2];
-            char[] biteMask = new char[8];
-            for (int i = 0; i < 8; i++)
-            {
-                biteMask[i] = (testByte & (1 << i)) == 0 ? '0' : '1';
-            }
 
             if (!biteMask[1].Equals('1') && curtainIsOn)
             {
                 MessageBox.Show("Exxx: The curtain didn't open!!!");
+                throw new Exception("Exxx: The curtain didn't open!!!");
             }
 
             if (!biteMask[2].Equals('1') && !curtainIsOn)
             {
                 MessageBox.Show("Exxx: The curtain didn't CLOSE!!!");
+                throw new Exception("Exxx: The curtain didn't CLOSE!!!");
             }
         }
 
@@ -278,52 +342,50 @@ namespace TestStandApp.ViewModels.Notifications
                 platform = DictinaryToTheCommand("Platform reverse with 600 speed");
             }
 
-            byte[] statusByteArray = new byte[] { 220, 2, 11, 23 };
+            byte[] statusByteArray = DictinaryToTheCommand("Status");
 
             byte[] testInData = RunCommand(statusByteArray, _testFilePath);
+            char[] biteMask = ByteForBite(testInData, 4);
 
-            byte testByte = testInData[3];
-            char[] biteMask = new char[8];
-            for (int i = 0; i < 8; i++)
+            if (direction)
             {
-                biteMask[i] = (testByte & (1 << i)) == 0 ? '0' : '1';
+                if (biteMask[0].Equals('1'))
+                {
+                    byte[] executedCommand = RunCommand(platform, _testFilePath);
+                    char[] biteMaskPlatform = ByteForBite(executedCommand, 2);
+
+
+                    if (!biteMaskPlatform[0].Equals('1'))
+                    {
+                        MessageBox.Show("Exxx: The platform didn't run!!!");
+                        throw new Exception("Exxx: The platform didn't run!!!");
+                    }
+                    else
+                    {
+                        Thread.Sleep(TimeoutRunPlatform);
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Exxx: The platform situated on different place!");
+                    throw new Exception("Exxx: The platform situated on different place!");
+                }
             }
 
-            if (biteMask[1].Equals('1') && direction)
+            if (biteMask[1].Equals('1') && !direction)
             {
                 byte[] executedCommand = RunCommand(platform, _testFilePath);
+                char[] biteMaskPlatform = ByteForBite(executedCommand, 2);
 
-                byte testBytePlatform = executedCommand[2];
-                char[] biteMaskPlatform = new char[8];
-                for (int i = 0; i < 8; i++)
-                {
-                    biteMaskPlatform[i] = (testBytePlatform & (1 << i)) == 0 ? '0' : '1';
-                }
 
-                if (!biteMaskPlatform[0].Equals('1'))
+                if (!biteMaskPlatform[1].Equals('1'))
                 {
                     MessageBox.Show("Exxx: The platform didn't run!!!");
+                    throw new Exception("Exxx: The platform didn't run!!!");
                 }
-            }
-            else
-            {
-                MessageBox.Show("Exxx: The platform situated on different place!");
-            }
-
-            if (biteMask[0].Equals('1') && !direction)
-            {
-                byte[] executedCommand = RunCommand(platform, _testFilePath);
-
-                byte testBytePlatform = executedCommand[2];
-                char[] biteMaskPlatform = new char[8];
-                for (int i = 0; i < 8; i++)
+                else
                 {
-                    biteMaskPlatform[i] = (testBytePlatform & (1 << i)) == 0 ? '0' : '1';
-                }
-
-                if (!biteMaskPlatform[6].Equals('1'))
-                {
-                    MessageBox.Show("Exxx: The platform didn't run!!!");
+                    Thread.Sleep(TimeoutRewersePlatform);
                 }
             }
         }
@@ -343,29 +405,28 @@ namespace TestStandApp.ViewModels.Notifications
                 byte[] testInData = new byte[_port.BytesToRead];
                 byte checkRead = 0;
 
-                while (testInData.Length!=0 && testInData[0] == 0)
+                while (testInData.Length != 0 && testInData[0] == 0)
                 {
                     if (checkRead == QuantityTryPortRead)
                     {
                         MessageBox.Show("Exxx: The data didn't read!");
-                        break;
+                        throw new Exception("Exxx: The data didn't read!");
                     }
 
                     _port.Read(testInData, 0, testInData.Length);
                     checkRead++;
                 }
 
-
-
                 string testString16s = ByteArrayToFormattedString(testInData);
                 LoggsToFile("Out", testString16s, filePath);
+                _resultText = testString16s;
 
                 return testInData;
             }
             else
             {
                 MessageBox.Show("Exxx: The port is closet!");
-                return new byte[0];
+                throw new Exception("Exxx: The port is closet!");
             }
         }
 
@@ -430,7 +491,7 @@ namespace TestStandApp.ViewModels.Notifications
                 { "Curtain on", "0xDC 0x04 0x03 0x01 0x00" },
                 { "Curtain off", "0xDC 0x04 0x04 0x01 0x00" },
                 { "Status", "0xDC 0x02 0x0B" },
-                { "Work?", "0xDC 0x04 0x00 0x1B" },
+                { "Work?", "0xDC 0x04 0x1B 0x01 0x01" },
                 { "Exceptions?", "0xDC 0x02 0x0A" }
             };
         }
