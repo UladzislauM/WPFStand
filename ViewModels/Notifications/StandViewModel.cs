@@ -1,538 +1,159 @@
-﻿using System;
+﻿using StandConsoleApp.Buisness.Logger;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
-using System.IO.Ports;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Windows;
-using TestStandApp.Models;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using TestStandApp.Buisness.Equipment;
+using TestStandApp.Connections;
 using TestStandApp.ViewModels.Commands;
 
 namespace TestStandApp.ViewModels.Notifications
 {
     internal class StandViewModel : MainViewModel
     {
-        private const int MillisecondsTimeout = 1000;
-        private const int QualityTryLineProgram = 1000;
-        private const int QuantityTryPortRead = 6;
-        private const int TimeoutRewersePlatform = 4000;
-        private const int TimeoutRunPlatform = 5000;
-        private string _filePath = @"C:\LogsStandTest.txt";
-        private string _testFilePath = @"C:\LogsStandTestTest.txt";
-        private SerialPort _port;
-        private string _selectedCommand;
-        private string _resultText;
-        private string _enteredCommandText;
-        private string[] _portNames;
-        private string _selectedSerialPort;
-        private bool _isActiveButton;
-        private bool _cicleCommand;
-        private bool _openPort;
+        private int selectedLocalSerialPortDetector = 4001;
+        private int selectedRemoteSerialPortDetector = 3000;
+        private string selectedAddressDetector = "127.0.0.1";
+        public int selectedImageWidth = 10;
+        public int selectedImageHeight = 704;
+        private byte[] _imageBytes;
+        private Detector _detector;
+        private ConsoleLogger _logger = new ConsoleLogger();
+        private Queue<byte[]> _queue;
+        private Channel<byte[]> _channel;
+        public AsyncSingleCommand StartScan { get; private set; }
 
-
-        private ObservableCollection<string> _serialPortNames = new ObservableCollection<string>();
-        private Dictionary<string, string> _commandsDictionary = new Dictionary<string, string>();
+        private ObservableCollection<ImageSource> _imageCollection;
 
         public StandViewModel()
         {
-            CreateCommandsForDictionary();
-            FillSerialPortNames();
-            ExecuteCommand = new SingleCommand(Execute, CanExecute);
+            StartScan = new AsyncSingleCommand(ExecuteAsync, CanExecute);
+            _detector = new Detector(new LanConnection(_logger), _logger);
+            _queue = new Queue<byte[]>();
+            _imageCollection = new ObservableCollection<ImageSource>();
         }
 
-        public bool OpenPort
+
+        public ObservableCollection<ImageSource> ImageCollection
         {
-            get => _openPort;
+            get => _imageCollection;
             set
             {
-                _openPort = value;
-                OnPropertyChanged("OpenPort");
-                ChangeButton();
-                OpenPortForProgram();
-                CheckStatement();
+                _imageCollection = value;
+                OnPropertyChanged(nameof(ImageCollection));
             }
         }
 
-        public bool CicleCommand
+        //public byte[] ImageBytes
+        //{
+        //    get => _imageBytes;
+        //    set
+        //    {
+        //        _imageBytes = value;
+        //        OnPropertyChanged(nameof(ImageBytes));
+        //    }
+        //}
+
+        public async Task ExecuteAsync()
         {
-            get => _cicleCommand;
-            set
+            try
             {
-                _cicleCommand = value;
-                OnPropertyChanged("CicleCommand");
-                ChangeButton();
-                StartRunLineProgramThread();
-            }
-        }
+                _channel = Channel.CreateUnbounded<byte[]>();
 
-        public string SelectedSerialPort
-        {
-            get => _selectedSerialPort;
-            set
-            {
-                _selectedSerialPort = value;
-                OnPropertyChanged("SelectedSerialPort");
-            }
-        }
+                await _detector.StartScan(
+                    selectedAddressDetector,
+                    selectedLocalSerialPortDetector,
+                    selectedRemoteSerialPortDetector);
+                byte checkingBytes = 0;
+                byte stop = 20;
 
-        public ObservableCollection<string> SerialPortNames
-        {
-            get => _serialPortNames;
-            set
-            {
-                _serialPortNames = value;
-                OnPropertyChanged("SerialPortNames");
-            }
-        }
+                Task writeBytes = WriteBytesToQueue(stop);
 
-        public bool IsActiveButton
-        {
-            get => _isActiveButton;
-            set
-            {
-                _isActiveButton = value;
-                OnPropertyChanged("isActiveListBox");
-            }
-        }
+                byte[] bytesFromChannel;
 
-        public string SelectedCommand
-        {
-            get => _selectedCommand;
-            set
-            {
-                _selectedCommand = value;
-                OnPropertyChanged("SelectedCommand");
-                IsActiveButton = true;
-            }
-        }
+                ImageSource imageSource;
 
-        public string ResultText
-        {
-            get => _resultText = "Resualt";
-            set
-            {
-                _resultText = value;
-                OnPropertyChanged("ResultText");
-            }
-        }
-        public string EnteredCommandText
-        {
-            get => _enteredCommandText = "Write command";
-            set
-            {
-                _enteredCommandText = value;
-                OnPropertyChanged("EnteredCommandText");
-            }
-        }
-
-        public Dictionary<string, string> CommandsDictionary
-        {
-            get => _commandsDictionary;
-            set
-            {
-                _commandsDictionary = value;
-                OnPropertyChanged("CommandsDictionary");
-            }
-        }
-
-        public SingleCommand ExecuteCommand { get; private set; }
-
-        public void Execute(object parameter)
-        {
-            if (_selectedCommand == null)
-                return;
-
-            byte[] outByteArray = WriteData();
-
-            RunCommand(outByteArray, _filePath);
-        }
-
-        private void OpenPortForProgram()
-        {
-            if (_openPort)
-            {
-                _port = new SerialPort(_selectedSerialPort ?? "Empty port",
-             19200, Parity.None, 8, StopBits.One);
-                try
+                while (checkingBytes != stop)
                 {
-                    _port.WriteTimeout = 500;
-                    _port.ReadTimeout = 500;
-                    _port.Open();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Exxx:" + ex.Message);
-                }
-            }
-            else
-            {
-                ClosePort();
-            }
-        }
+                    bytesFromChannel = await _channel.Reader.ReadAsync();
+                    imageSource = LoadImageFromBytes(bytesFromChannel);
 
-        private void CheckStatement()
-        {
-            if (!_port.IsOpen)
-            {
-                MessageBox.Show("Exxx: The port is closet or lost!");
-            }
-            else
-            {
-                byte[] exceptionsCommandArray = DictinaryToTheCommand("Exceptions?");
-                byte[] exceptionsByteArray = RunCommand(exceptionsCommandArray, _filePath);
-
-                for (byte i = 3; i < 7; i++)
-                {
-
-                    char[] exceptionBites = ByteForBite(exceptionsByteArray, i);
-
-                    for (byte k = 0; k < 7; k++)
+                    Application.Current.Dispatcher.Invoke(() =>
                     {
-                        if (exceptionBites[k].Equals('1'))
-                        {
-                            MessageBox.Show("Exxx: There is exception with equipment - lets see logs!");
-                        }
-                    }
+                        AddImage(imageSource);
+                    });
+                    checkingBytes++;
                 }
-
-                byte[] statusByteArray = DictinaryToTheCommand("Status");
-
-                byte[] testInData = RunCommand(statusByteArray, _testFilePath);
-                char[] biteMask = ByteForBite(testInData, 4);
-
-                if (!biteMask[0].Equals('1'))
-                {
-                    MessageBox.Show("Exxx: The platform situated on different place!");
-                }
-
+            }
+            catch (Exception ex)
+            {
+                _logger.Log("Execute: " + ex.Message);
+            }
+            finally
+            {
+                await _detector.StopScan();
+                _channel.Writer.Complete();
             }
         }
 
-        public void ClosePort()
+        private async Task WriteBytesToQueue(byte stop)
         {
-            if (_port != null && _port.IsOpen)
+            byte checkingBytes = 0;
+            byte[] preparedBytes;
+            while (checkingBytes != stop)
             {
-                _port.Close();
-                _port.Dispose();
-            }
-        }
+                preparedBytes = await _detector.ScanAsync(
+                selectedImageWidth,
+                selectedImageHeight);
 
-        private void StartRunLineProgramThread()
-        {
-            Thread standLineStartThreed = new Thread(RunLineProgram);
+                await _channel.Writer.WriteAsync(preparedBytes);
 
-            standLineStartThreed.Start();
-        }
-
-        private void RunLineProgram()
-        {
-            byte[] statusByteArray = DictinaryToTheCommand("Status");
-            bool permissionForRun = false;
-            byte check = 0;
-
-            while (_cicleCommand)
-            {
-                if (check == QualityTryLineProgram)
-                {
-                    _cicleCommand = false;
-                }
-
-                byte[] testInData = RunCommand(statusByteArray, _testFilePath);
-                char[] biteMask = ByteForBite(testInData, 3);
-
-                if (biteMask[5].Equals('1'))
-                {
-                    permissionForRun = true;
-                    break;
-                }
-                check++;
-            }
-
-            if (permissionForRun)//check each time
-            {
-                try
-                {
-                    CurtainOnOff(true);
-
-                    RunPlatform(true);
-
-                    CurtainOnOff(false);
-
-                    RunPlatform(false);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Exxx: Something went wrong...");
-                }
-                finally
-                {
-                    CurtainOnOff(false);
-                    _cicleCommand = false;
-                    permissionForRun = false;
-                    ChangeButton();
-                }
-            }
-        }
-
-        private static char[] ByteForBite(byte[] testInData, byte testByteNumber)
-        {
-            if (testByteNumber <= testInData.Length)
-            {
-                byte testByte = testInData[testByteNumber];
-                char[] biteMask = new char[8];
-
-                for (int i = 0; i < 8; i++)
-                {
-                    biteMask[i] = (testByte & (1 << i)) == 0 ? '0' : '1';
-                }
-
-                return biteMask;
-            }
-            else
-            {
-                MessageBox.Show("Exxx: check number more than array lenth!");
-                throw new Exception("Exxx: check number more than array lenth!");
-            }
-        }
-
-        private void CurtainOnOff(bool curtainIsOn)
-        {
-            byte[] curtain;
-
-            if (curtainIsOn)
-            {
-                curtain = DictinaryToTheCommand("Curtain on");
-            }
-            else
-            {
-                curtain = DictinaryToTheCommand("Curtain off");
-            }
-
-            byte[] executedCommand = RunCommand(curtain, _testFilePath);
-            char[] biteMask = ByteForBite(executedCommand, 2);
-
-
-            if (!biteMask[1].Equals('1') && curtainIsOn)
-            {
-                MessageBox.Show("Exxx: The curtain didn't open!!!");
-                throw new Exception("Exxx: The curtain didn't open!!!");
-            }
-
-            if (!biteMask[2].Equals('1') && !curtainIsOn)
-            {
-                MessageBox.Show("Exxx: The curtain didn't CLOSE!!!");
-                throw new Exception("Exxx: The curtain didn't CLOSE!!!");
-            }
-        }
-
-        private void RunPlatform(bool direction)
-        {
-            byte[] platform = new byte[] { };
-            if (direction)
-            {
-                platform = DictinaryToTheCommand("Working stroke of the platform with 200 speed");
-            }
-            else
-            {
-                platform = DictinaryToTheCommand("Platform reverse with 600 speed");
-            }
-
-            byte[] statusByteArray = DictinaryToTheCommand("Status");
-
-            byte[] testInData = RunCommand(statusByteArray, _testFilePath);
-            char[] biteMask = ByteForBite(testInData, 4);
-
-            if (direction)
-            {
-                if (biteMask[0].Equals('1'))
-                {
-                    byte[] executedCommand = RunCommand(platform, _testFilePath);
-                    char[] biteMaskPlatform = ByteForBite(executedCommand, 2);
-
-
-                    if (!biteMaskPlatform[0].Equals('1'))
-                    {
-                        MessageBox.Show("Exxx: The platform didn't run!!!");
-                        throw new Exception("Exxx: The platform didn't run!!!");
-                    }
-                    else
-                    {
-                        Thread.Sleep(TimeoutRunPlatform);
-                    }
-                }
-                else
-                {
-                    MessageBox.Show("Exxx: The platform situated on different place!");
-                    throw new Exception("Exxx: The platform situated on different place!");
-                }
-            }
-
-            if (biteMask[1].Equals('1') && !direction)
-            {
-                byte[] executedCommand = RunCommand(platform, _testFilePath);
-                char[] biteMaskPlatform = ByteForBite(executedCommand, 2);
-
-
-                if (!biteMaskPlatform[1].Equals('1'))
-                {
-                    MessageBox.Show("Exxx: The platform didn't run!!!");
-                    throw new Exception("Exxx: The platform didn't run!!!");
-                }
-                else
-                {
-                    Thread.Sleep(TimeoutRewersePlatform);
-                }
-            }
-        }
-
-        private byte[] RunCommand(byte[] command, string filePath)
-        {
-            if (_port != null && _port.IsOpen)
-            {
-                _port.DiscardInBuffer();
-                _port.DiscardOutBuffer();
-
-                LoggsToFile("In", _selectedCommand, filePath);
-                _port.Write(command, 0, command.Length);
-
-                Thread.Sleep(MillisecondsTimeout);
-
-                byte[] testInData = new byte[_port.BytesToRead];
-                byte checkRead = 0;
-
-                while (testInData.Length != 0 && testInData[0] == 0)
-                {
-                    if (checkRead == QuantityTryPortRead)
-                    {
-                        MessageBox.Show("Exxx: The data didn't read!");
-                        throw new Exception("Exxx: The data didn't read!");
-                    }
-
-                    _port.Read(testInData, 0, testInData.Length);
-                    checkRead++;
-                }
-
-                string testString16s = ByteArrayToFormattedString(testInData);
-                LoggsToFile("Out", testString16s, filePath);
-                _resultText = testString16s;
-
-                return testInData;
-            }
-            else
-            {
-                MessageBox.Show("Exxx: The port is closet!");
-                throw new Exception("Exxx: The port is closet!");
+                checkingBytes++;
             }
         }
 
         private bool CanExecute(object parameter)
         {
-            return _selectedCommand != null;
+            return true;
         }
 
-        private string ByteArrayToFormattedString(byte[] byteArray)
+        public void AddImage(ImageSource image)
         {
-            string formattedString = "";
-
-            foreach (byte b in byteArray)
-            {
-                formattedString += "0x" + b.ToString("X2") + " ";
-            }
-
-            return formattedString.Trim();
+            _imageCollection.Add(image);
         }
 
-        private byte[] WriteData()
-        {
-            if (_enteredCommandText.Equals("Write command") || _enteredCommandText.Equals(" "))
-            {
-                string keysCommands = _selectedCommand ?? "Empty command";
-                byte[] byteArray = DictinaryToTheCommand(keysCommands);
-                return byteArray;
-            }
-            else
-            {
-                string input = _enteredCommandText;
-                byte[] byteArray = input.Split(' ').Select(s => Convert.ToByte(s, 16)).ToArray();
-                return byteArray;
-            }
-        }
-
-        private byte[] DictinaryToTheCommand(string keysCommands)
-        {
-            string command = CommandsDictionary[keysCommands];
-            byte[] byteArray = command.Split(' ').Select(s => Convert.ToByte(s, 16)).ToArray();
-            byteArray = byteArray.Concat(new byte[] { CalculateLRC(byteArray) }).ToArray();
-            return byteArray;
-        }
-
-        private void FillSerialPortNames()
-        {
-            _portNames = SerialPort.GetPortNames();
-            foreach (string portName in _portNames)
-            {
-                SerialPortNames.Add(portName);
-            }
-        }
-
-        private void CreateCommandsForDictionary()
-        {
-            CommandsDictionary = new Dictionary<string, string>
-            {
-                { "Scan", "0xDC 0x04 0x28 0x02 0x058" },
-                { "Starting position", "0xDC 0x02 0x2D" },
-                { "Working stroke of the platform with 200 speed", "0xDC 0x04 0x01 0x00 0xC8" },
-                { "Platform reverse with 600 speed", "0xDC 0x04 0x02 0x02 0x58" },
-                { "Curtain on", "0xDC 0x04 0x03 0x01 0x00" },
-                { "Curtain off", "0xDC 0x04 0x04 0x01 0x00" },
-                { "Status", "0xDC 0x02 0x0B" },
-                { "Work?", "0xDC 0x04 0x1B 0x01 0x01" },
-                { "Exceptions?", "0xDC 0x02 0x0A" }
-            };
-        }
-
-        private byte CalculateLRC(byte[] data)
-        {
-            int sum = 0;
-            for (int i = 0; i < data.Length; i++)
-            {
-                sum -= data[i];
-            }
-            byte crc = (byte)(sum);
-
-            return crc;
-        }
-
-        private void LoggsToFile(string who, string log, string path)
+        public ImageSource LoadImageFromBytes(byte[] imageBytes)
         {
             try
             {
-                using (StreamWriter writer = new StreamWriter(path, true))
+                if (imageBytes == null || imageBytes.Length == 0)
                 {
-                    writer.WriteLine(who + " " + log);
-                    writer.Close();
+                    throw new Exception("Load image from bytes: Empty bytes");
                 }
+
+                int width = selectedImageWidth;
+                int height = selectedImageHeight;
+                PixelFormat format = PixelFormats.Gray16;
+
+                WriteableBitmap writeableBitmap = new WriteableBitmap(width,
+                   height, 96, 96, format, null);
+                Int32Rect rect = new Int32Rect(0, 0, width, height);
+                int stride = (width * format.BitsPerPixel + 7) / 8;
+
+                writeableBitmap.WritePixels(rect, imageBytes, stride, 0);
+
+                return writeableBitmap;
+
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Exxx:" + ex.Message);
-            }
-        }
-
-        private void ChangeButton()
-        {
-            if (_cicleCommand == true)
-            {
-                _cicleCommand = true;
-            }
-            else
-            {
-                _cicleCommand = false;
+                throw new Exception("Load image from bytes: " + ex.Message);
             }
         }
     }

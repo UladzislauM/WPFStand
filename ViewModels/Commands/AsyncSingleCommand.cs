@@ -1,16 +1,17 @@
 ﻿using System;
+using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace TestStandApp.ViewModels.Commands
 {
-    internal class SingleCommand : ICommand
+    internal class AsyncSingleCommand : ICommand
     {
-        private readonly Action<object> _execute;
+        private readonly Func<Task> _executeAsync;
         private readonly Func<object?, bool>? _canExecute;
 
-        public SingleCommand(Action<object?> execute, Func<object?, bool>? canExecute = null)
+        public AsyncSingleCommand(Func<Task> executeAsync, Func<object?, bool>? canExecute = null)
         {
-            this._execute = execute;
+            this._executeAsync = executeAsync ?? throw new ArgumentNullException(nameof(executeAsync));
             this._canExecute = canExecute;
         }
 
@@ -18,9 +19,18 @@ namespace TestStandApp.ViewModels.Commands
         {
             return _canExecute == null || _canExecute(parameter);
         }
-        public void Execute(object? parameter)
+
+        public async void Execute(object? parameter)
         {
-            _execute(parameter ?? "Empty parameter");
+            await ExecuteAsync(parameter);
+        }
+
+        public async Task ExecuteAsync(object? parameter)
+        {
+            if (CanExecute(parameter))
+            {
+                await _executeAsync();
+            }
         }
 
         public event EventHandler? CanExecuteChanged
