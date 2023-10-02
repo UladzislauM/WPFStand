@@ -4,12 +4,12 @@ using System.Windows.Input;
 
 namespace TestStandApp.ViewModels.Commands
 {
-    internal class AsyncSingleCommand : ICommand
+    internal class SingleCommandAsync : ICommand
     {
         private readonly Func<Task> _executeAsync;
         private readonly Func<object?, bool>? _canExecute;
 
-        public AsyncSingleCommand(Func<Task> executeAsync, Func<object?, bool>? canExecute = null)
+        public SingleCommandAsync(Func<Task> executeAsync, Func<object?, bool>? canExecute = null)
         {
             this._executeAsync = executeAsync ?? throw new ArgumentNullException(nameof(executeAsync));
             this._canExecute = canExecute;

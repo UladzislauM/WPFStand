@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -12,9 +13,11 @@ namespace TestStandApp.Buisness.Equipment
 {
     internal class Detector
     {
+        private byte[] _data;
         private readonly LanConnection _lanConnection;
         private readonly ILogger _logger;
         private Dictionary<string, string> _commandsDictionaryDetector;
+        private Channel<byte[]> _channelForReadBytes;
 
         public Detector(LanConnection lanConnection, ILogger logger)
         {
@@ -122,60 +125,37 @@ namespace TestStandApp.Buisness.Equipment
         {
             int packetsRow = 0;
             int imageArrayNumber = 0;
+            Task writeBytesForChannel = WriteBytesIntoChannel(packets);
 
-            byte[] data = await _lanConnection.ReceiveAMessageAsync();
-
-            bool isHeader = CheckTheHeader(data);
-
-            bool checkEnergy = CheckTheEnergy(data, isHeader);
-
-            byte[] imageArrayByte = new byte[packets * imageHeight];
-
-            int checkPackageRowFor2Energy = 2;
-            while (packetsRow != packets - 1)
+            byte[] imageArrayByte = new byte[(packets * imageHeight)];
+            int position = 0;
+            while (packetsRow != packets)
             {
                 try
                 {
-                    int i = 1;
-                    if (CheckTheHeader(data))
+                    _data = await _channelForReadBytes.Reader.ReadAsync();
+                    int i = 0;
+                    if (CheckTheHeader(_data))
                     {
                         i = 8;
                     }
-                    if (checkEnergy)
+
+                    for (; i < _data.Length - 1; i++)
                     {
-                        for (; i < data.Length; i++)
+                        if (imageArrayNumber != imageHeight)
                         {
-                            if (imageArrayNumber != imageHeight)
+                            position = packetsRow + imageArrayNumber * packets;
+                            if (imageArrayNumber > 511)
                             {
-                                imageArrayByte[packetsRow + imageArrayNumber * packets] = data[i++];
-                                imageArrayByte[packetsRow + imageArrayNumber * packets + 1] = data[i];
-                                imageArrayNumber++;
+                                position--;
                             }
-                            else
-                            {
-                                break;
-                            }
+                            imageArrayByte[position] = _data[i++];
+                            imageArrayByte[position + 1] = _data[i];
+                            imageArrayNumber++;
                         }
-                    }
-                    else
-                    {
-                        for (; i < data.Length - 1; i++)
+                        else
                         {
-                            if (checkPackageRowFor2Energy == 2)
-                            {
-                                if (imageArrayNumber != imageHeight)
-                                {
-                                    imageArrayByte[packetsRow + imageArrayNumber * packets] = data[i++];
-                                    imageArrayByte[packetsRow + imageArrayNumber * packets + 1] = data[i++];
-                                    imageArrayNumber++;
-                                    checkPackageRowFor2Energy = 0;
-                                }
-                                else
-                                {
-                                    break;
-                                }
-                            }
-                            checkPackageRowFor2Energy++;
+                            break;
                         }
                     }
 
@@ -184,17 +164,36 @@ namespace TestStandApp.Buisness.Equipment
                         imageArrayNumber = 0;
                     }
                     packetsRow++;
-                    data = await _lanConnection.ReceiveAMessageAsync();
-                    checkPackageRowFor2Energy = 0;
+                    if (packetsRow == 80)
+                    {
+                        Console.WriteLine();
+                    }
                     _logger.Log("Read" + packetsRow);
                 }
                 catch (Exception ex)
                 {
+                    writeBytesForChannel.Dispose();
                     await ExecuteCommandAsync("Stop scan");
                     throw new Exception("Getting bytes: " + ex.Message);
                 }
             }
-            return imageArrayByte; //TODO Check lines
+            writeBytesForChannel.Dispose();
+            return imageArrayByte;
+        }
+
+        private async Task WriteBytesIntoChannel(int packets)
+        {
+            _channelForReadBytes = Channel.CreateUnbounded<byte[]>();
+            byte checkingBytes = 0;
+            byte[] preparedBytes;
+            while (checkingBytes != packets)
+            {
+                preparedBytes = await _lanConnection.ReceiveAMessageAsync();
+
+                await _channelForReadBytes.Writer.WriteAsync(preparedBytes);
+
+                checkingBytes++;
+            }
         }
 
         private static bool CheckTheEnergy(byte[] data, bool isHeader)

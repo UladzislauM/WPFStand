@@ -33,6 +33,12 @@ namespace TestStandApp
         private void MainWindow_Closed(object sender, EventArgs e)
         {
             //viewModel.ClosePort();
+
+        }
+
+        private void itemsControl_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            scrollViewer.ScrollToRightEnd();
         }
     }
 }
