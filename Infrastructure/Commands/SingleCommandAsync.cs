@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using System.Windows.Input;
 
-namespace TestStandApp.ViewModels.Commands
+namespace TestStandApp.Infrastructure.Commands
 {
     internal class SingleCommandAsync : ICommand
     {
@@ -11,18 +11,20 @@ namespace TestStandApp.ViewModels.Commands
 
         public SingleCommandAsync(Func<Task> executeAsync, Func<object?, bool>? canExecute = null)
         {
-            this._executeAsync = executeAsync ?? throw new ArgumentNullException(nameof(executeAsync));
-            this._canExecute = canExecute;
+            _executeAsync = executeAsync ?? throw new ArgumentNullException(nameof(executeAsync));
+            _canExecute = canExecute;
         }
 
         public bool CanExecute(object? parameter)
         {
-            return _canExecute == null || _canExecute(parameter);
+            //return _canExecute == null || _canExecute(parameter);
+            throw new NotImplementedException();
         }
 
         public async void Execute(object? parameter)
         {
-            await ExecuteAsync(parameter);
+            //await ExecuteAsync(parameter);
+            throw new NotSupportedException();
         }
 
         public async Task ExecuteAsync(object? parameter)
