@@ -1,6 +1,6 @@
 ﻿using System.IO;
 
-namespace StandConsoleApp.Buisness.Logger
+namespace TestStandApp.Buisness.Logger
 {
     public class ConsoleLogger : ILogger
     {

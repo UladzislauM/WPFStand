@@ -58,21 +58,28 @@
                         </ScrollViewer>
                     </Border>
                     <Button Content="Start scan"
-                HorizontalAlignment="Left" 
-                Margin="10,10,0,0"
-                VerticalAlignment="Top"
-                Width="89" Height="25"
-                Command="{Binding ExecuteStartScan}"/>
+                        HorizontalAlignment="Left" 
+                        Margin="10,10,0,0"
+                        VerticalAlignment="Top"
+                        Width="89" Height="25"
+                        Command="{Binding ExecuteStartScan}"/>
                     <Button Content="Stop scan"
-                x:Name="stopMoving"
-                HorizontalAlignment="Left" 
-                Margin="10,40,0,0"
-                VerticalAlignment="Top"
-                Width="89" Height="25"
-                Command="{Binding ExecuteStopScan}"/>
+                        x:Name="stopMoving"
+                        HorizontalAlignment="Left" 
+                        Margin="10,40,0,0"
+                        VerticalAlignment="Top"
+                        Width="89" Height="25"
+                        Command="{Binding ExecuteStopScan}"/>
                 </Grid>
             </TabItem>
-            <TabItem Header="Stand"></TabItem>
+            <TabItem Header="Stand">
+                <Button Content="Start scenario"
+                    HorizontalAlignment="Left" 
+                    Margin="10,10,0,0"
+                    VerticalAlignment="Top"
+                    Width="89" Height="25"
+                    Command="{Binding ExecuteStartScenario}"/>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </Window>

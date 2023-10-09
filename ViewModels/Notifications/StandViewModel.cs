@@ -1,4 +1,4 @@
-﻿using StandConsoleApp.Buisness.Logger;
+﻿using TestStandApp.Buisness.Logger;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -16,7 +16,7 @@ using System.Windows.Media.Imaging;
 using System.Xml.Linq;
 using TestStandApp.Buisness.Equipment;
 using TestStandApp.Connections;
-using TestStandApp.ViewModels.Commands;
+using TestStandApp.Infrastructure.Commands;
 
 namespace TestStandApp.ViewModels.Notifications
 {
@@ -26,7 +26,7 @@ namespace TestStandApp.ViewModels.Notifications
         private int _selectedLocalSerialPortDetector = 4001;
         private int _selectedRemoteSerialPortDetector = 3000;
         private string _selectedAddressDetector = "127.0.0.1";
-        private int _selectedImageWidth = 40;
+        private int _selectedImageWidth = 20;
         private int _selectedImageHeight = 704;
         private double _offsetX;
         private byte _checkingBytes;
@@ -34,14 +34,16 @@ namespace TestStandApp.ViewModels.Notifications
         private ConsoleLogger _logger = new ConsoleLogger();
         private Channel<byte[]> _channelForPackets;
         public SingleCommandAsync ExecuteStartScan { get; private set; }
-        public SingleCommandAsync ExecuteStopScan { get; private set; }
+        public SingleCommand ExecuteStopScan { get; private set; }
+        public SingleCommand ExecuteStartScenario { get; private set; }
 
         private ObservableCollection<ImageSource> _imageCollection;
 
         public StandViewModel()
         {
-            ExecuteStartScan = new SingleCommandAsync(ExecuteStartScanAsync, CanExecute);
-            ExecuteStopScan = new SingleCommandAsync(ExecuteStopScanAsync, CanExecute);
+            ExecuteStartScan = new SingleCommandAsync(ExecuteStartScanCommandAsync, CanExecute);
+            ExecuteStopScan = new SingleCommand(ExecuteStopScanCommand, CanExecute);
+            ExecuteStartScenario = new SingleCommand(ExecuteStartScenarioCommand, CanExecute);
             _detector = new Detector(new LanConnection(_logger), _logger);
             _imageCollection = new ObservableCollection<ImageSource>();
         }
@@ -89,12 +91,12 @@ namespace TestStandApp.ViewModels.Notifications
             }
         }
 
-        public async Task ExecuteStopScanAsync()
+        public void ExecuteStopScanCommand(object parameter)
         {
             _isStartScan = false;
         }
-
-        public async Task ExecuteStartScanAsync()
+        
+        public async Task ExecuteStartScanCommandAsync()
         {
             try
             {
@@ -150,6 +152,11 @@ namespace TestStandApp.ViewModels.Notifications
                 await _detector.StopScan();
                 _channelForPackets.Writer.Complete();
             }
+        }
+
+        public void ExecuteStartScenarioCommand(object parameter)
+        {
+            _isStartScan = false;
         }
 
         private async Task WriteBytesToChannel(byte stop)

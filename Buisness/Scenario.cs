@@ -1,8 +1,8 @@
-﻿using StandConsoleApp.Buisness.Logger;
+﻿using TestStandApp.Buisness.Logger;
 using System.Collections;
 using TestStandApp.Connections;
 
-namespace StandConsoleApp.Buisness
+namespace TestStandApp.Buisness
 {
     internal class Scenario
     {

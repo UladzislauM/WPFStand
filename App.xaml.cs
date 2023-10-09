@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using StandConsoleApp.Buisness.Logger;
-using StandConsoleApp.Buisness;
+using TestStandApp.Buisness.Logger;
+using TestStandApp.Buisness;
 using System;
 using System.Collections.Generic;
 using System.Configuration;

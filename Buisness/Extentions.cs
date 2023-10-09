@@ -3,7 +3,7 @@ using System.Collections;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace StandConsoleApp.Buisness
+namespace TestStandApp.Buisness
 {
     internal static class Extentions
     {

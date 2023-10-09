@@ -1,13 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Text;
+using SixLabors.ImageSharp.Formats.Jpeg;
 using System.Threading.Channels;
+using TestStandApp.Connections;
+using System.Collections.Generic;
+using System;
 using System.Threading.Tasks;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
-using StandConsoleApp.Buisness.Logger;
-using TestStandApp.Connections;
+using TestStandApp.Buisness.Logger;
 
 namespace TestStandApp.Buisness.Equipment
 {
@@ -53,7 +53,7 @@ namespace TestStandApp.Buisness.Equipment
                 _logger.Log("Execute command");
 
                 byte[] data = CreateAByteCommand(command);
-                byte[] receivingData = await _lanConnection.ExecuteCommandAsync(data);
+                byte[] receivingData = _lanConnection.ExecuteCommand(data);
 
                 if (receivingData[0] == 0)
                 {
@@ -188,7 +188,7 @@ namespace TestStandApp.Buisness.Equipment
             byte[] preparedBytes;
             while (checkingBytes != packets)
             {
-                preparedBytes = await _lanConnection.ReceiveAMessageAsync();
+                preparedBytes = _lanConnection.ReceiveAMessage();
 
                 await _channelForReadBytes.Writer.WriteAsync(preparedBytes);
 

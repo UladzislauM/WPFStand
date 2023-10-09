@@ -1,6 +1,6 @@
-﻿using StandConsoleApp.Buisness.Logger;
+﻿using TestStandApp.Buisness.Logger;
 using System.IO.Ports;
-using StandConsoleApp.Buisness;
+using TestStandApp.Buisness;
 using System.Threading;
 using System.Threading.Tasks;
 using System;
@@ -10,7 +10,7 @@ namespace TestStandApp.Connections
     internal class SerialPortConnection
     {
         public int DelayProcessorTimeout { get; set; }
-        private const int QuantityTryPortRead = 6;
+        private int _firstByte = 0;
         private SemaphoreSlim _semaphore;
         private readonly ILogger _logger;
 
@@ -21,9 +21,8 @@ namespace TestStandApp.Connections
             DelayProcessorTimeout = 100;
         }
 
-        public async Task<SerialPort> OpenPortAsync(SerialPort port, string serialPort, int speed)
+        public SerialPort OpenPort(SerialPort port, string serialPort, int speed)
         {
-            await _semaphore.WaitAsync();
             try
             {
                 port = new SerialPort(serialPort ?? "Empty port", speed, Parity.None, 8, StopBits.One);
@@ -34,10 +33,6 @@ namespace TestStandApp.Connections
             catch (Exception ex)
             {
                 throw new Exception(String.Format("Opan port for device: {0}, {1}", port.ToString, ex.Message));
-            }
-            finally
-            {
-                _semaphore.Release();
             }
         }
 
@@ -50,7 +45,7 @@ namespace TestStandApp.Connections
             }
         }
 
-        public async Task<byte[]> RunCommandAsync(SerialPort port, byte[] writeData)
+        public async Task<byte[]> RunCommandStandAsync(SerialPort port, byte[] writeData)
         {
             await _semaphore.WaitAsync();
             try
@@ -60,21 +55,18 @@ namespace TestStandApp.Connections
                     port.DiscardInBuffer();
                     port.DiscardOutBuffer();
 
-                    Task writeDataTask = WriteDataAsync(port, writeData);
-                    await Extentions.DelayTimeoutAsync(writeDataTask);
+                    port.Write(writeData, 0, writeData.Length);
 
-                    await CheckReadBytesAsync(port);
-
-                    byte[] readData = ReadData(port);
+                    byte[] readData = ReadDataStand(port);
 
                     string hexString = ByteArrayToFormattedString(readData);
-                    //_logger.Log("Read: " + hexString);
+                    _logger.Log("Read: " + hexString);
 
                     return readData;
                 }
                 else
                 {
-                    throw new Exception("Run Command - The port is closet!");
+                    throw new Exception("Run Command async - The port is closet!");
                 }
             }
             catch (Exception ex)
@@ -87,64 +79,146 @@ namespace TestStandApp.Connections
             }
         }
 
-        private async Task WriteDataAsync(SerialPort port, byte[] writeData)
+        private byte[] ReadDataStand(SerialPort port)
         {
-            await Task.Run(() =>
+            Task.Run(() => { Task delayReadByte = DelayRead(); });
+            _firstByte = port.ReadByte();
+            if (_firstByte > 0)
             {
-                port.Write(writeData, 0, writeData.Length);
-            });
-            //string hexString = ByteArrayToFormattedString(writeData);
-
-            //_logger.Log("Write: " + hexString);
-        }
-
-        private byte[] ReadData(SerialPort port)
-        {
-            byte[] readData = new byte[port.BytesToRead];
-            byte checkRead = 0;
-            while (readData[0].Equals(0) && !readData[0].Equals(220)
-                || readData[0].Equals(0) && !readData[0].Equals(2))
-            {
-                if (checkRead == QuantityTryPortRead)
+                byte attemptsReadByte = 0;
+                while (_firstByte != 220)
                 {
-                    throw new Exception("Run Command - The data didn't read!");
+                    _firstByte = port.ReadByte();
+                    if (attemptsReadByte == 15)
+                    {
+                        throw new Exception("Read data stand: Bytes incorrect.");
+                    }
+                    attemptsReadByte++;
                 }
 
-                //_logger.Log("Run Command - Try read bytes");
-                port.Read(readData, 0, readData.Length);
-                checkRead++;
+                byte[] readDataHeader = new byte[port.BytesToRead];
+                port.Read(readDataHeader, 0, readDataHeader.Length);
 
-                CheckReadData(readData, checkRead);
+                if (readDataHeader.Length > 1)
+                {
+                    int dataLength = Convert.ToInt16(readDataHeader[0]);
+                    if (readDataHeader.Length - 1 == dataLength)
+                    {
+                        byte[] correctBytes = new byte[dataLength];
+                        Array.Copy(readDataHeader, 1, correctBytes, 0, correctBytes.Length);
+
+                        return correctBytes;
+                    }
+                    else
+                    {
+                        byte[] readData = ReadBytesFromQueue(port, dataLength);
+                        return readData;
+                    }
+                }
+                else
+                {
+                    port.Read(readDataHeader, 1, readDataHeader.Length - 1);
+                    int dataLength = readDataHeader[1];
+                    byte[] readdata = ReadBytesFromQueue(port, dataLength);
+                    return readdata;
+                }
+            }
+            else
+            {
+                throw new Exception("Read data stand: connection lost!");
+            }
+        }
+
+
+        private byte[] ReadBytesFromQueue(SerialPort port, int dataLength)
+        {
+            byte[] readData = new byte[dataLength];
+            for (int i = 0; i < readData.Length - 1; i++)
+            {
+                port.Read(readData, i, dataLength - i); //check reading byte
             }
 
             return readData;
         }
 
-        private void CheckReadData(byte[] writeData, byte checkRead)
+        public byte[] RunCommandGenerator(SerialPort port, byte[] writeData)
         {
-            if (writeData[0].Equals(220) && checkRead.Equals(2) || writeData[0].Equals(2) && checkRead.Equals(2))
+            try
             {
-                throw new Exception("Run Command - the read Data begin with a damage byte!");
+                if (port != null && port.IsOpen)
+                {
+                    port.DiscardInBuffer();
+                    port.DiscardOutBuffer();
+
+                    port.Write(writeData, 0, writeData.Length);
+
+                    byte[] readData = ReadDataGenerator(port);
+
+                    string hexString = ByteArrayToFormattedString(readData);
+                    _logger.Log("Read: " + hexString);
+
+                    return readData;
+                }
+                else
+                {
+                    throw new Exception("Run Command generator - The port is closet!");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Run command generator: " + ex.Message);
             }
         }
 
-        private async Task CheckReadBytesAsync(SerialPort port)
+        private byte[] ReadDataGenerator(SerialPort port)
         {
-            byte checkTryRead = 0;
-            while (port.BytesToRead < 1)
+            int firstByte = port.ReadByte();
+            if (firstByte > 0)
             {
-                if (checkTryRead == 10)
+                byte attemptsReadByte = 0;
+                while (firstByte != 2)
                 {
-                    throw new Exception("Run command - Empty data!");
+                    firstByte = port.ReadByte();
+                    if (attemptsReadByte == 15)
+                    {
+                        throw new Exception("Read data generator: Bytes incorrect.");
+                    }
+                    attemptsReadByte++;
                 }
-                await Task.Delay(DelayProcessorTimeout);
-                checkTryRead++;
+
+                byte dataArraySize = 20;
+                byte[] readData = new byte[dataArraySize];
+                readData[0] = (byte)firstByte;
+                byte iteration = 1;
+                while (readData[iteration] == 13)
+                {
+                    iteration++;
+                    if (readData.Length == iteration)
+                    {
+                        Array.Resize(ref readData, dataArraySize + 10);
+                    }
+                    readData[iteration] = (byte)port.ReadByte();
+                }
+                return readData;
+            }
+            else
+            {
+                throw new Exception("Read data generator: connection lost!");
             }
         }
 
         public string ByteArrayToFormattedString(byte[] readData)
         {
             return BitConverter.ToString(readData).Replace("-", " 0x").Insert(0, "0x");
+        }
+
+        private async Task DelayRead()
+        {
+            await Task.Delay(DelayProcessorTimeout);
+            if (_firstByte == 0)
+            {
+                _logger.Log("Read data stand: connection lost!");
+            }
         }
     }
 }
