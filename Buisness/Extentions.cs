@@ -2,13 +2,14 @@
 using System.Collections;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows.Media.Imaging;
+using System.Windows.Media;
+using System.Windows;
 
 namespace TestStandApp.Buisness
 {
     internal static class Extentions
     {
-        private const int DelayTimeout = 5000;
-
         public static BitArray ByteForBites(byte[] writeData, byte testByteNumber)
         {
             if (testByteNumber <= writeData.Length)
@@ -24,15 +25,30 @@ namespace TestStandApp.Buisness
             }
         }
 
-        public static async Task DelayTimeoutAsync(Task task)
+        public static ImageSource LoadImageFromBytes(byte[] imageBytes, int width, int height)
         {
-            if (await Task.WhenAny(task, Task.Delay(DelayTimeout)) == task)
+            try
             {
-                return;
+                if (imageBytes == null || imageBytes.Length == 0)
+                {
+                    throw new Exception("Load image from bytes: Empty bytes");
+                }
+
+                PixelFormat format = PixelFormats.Gray16;
+
+                WriteableBitmap writeableBitmap = new WriteableBitmap(width,
+                   height, 96, 96, format, null);
+                Int32Rect rect = new Int32Rect(0, 0, width, height);
+                int stride = (width * format.BitsPerPixel + 7) / 8;
+
+                writeableBitmap.WritePixels(rect, imageBytes, stride, 0);
+
+                return writeableBitmap;
+
             }
-            else
+            catch (Exception ex)
             {
-                throw new Exception("Delay timeout write async: the serial port unavailable");
+                throw new Exception("Load image from bytes: " + ex.Message);
             }
         }
     }

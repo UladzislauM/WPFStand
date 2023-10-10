@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using TestStandApp.Buisness.Logger;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows;
 
 namespace TestStandApp.Buisness.Equipment
 {
@@ -26,12 +29,12 @@ namespace TestStandApp.Buisness.Equipment
             CreateTheDictoinaryWithCommands();
         }
 
-        public async Task PrepareForUseAsync(string address, int localPort, int remotePort)
+        public void PrepareForUse(string address, int localPort, int remotePort)
         {
             try
             {
                 _lanConnection.SetUpAConnection(address, localPort, remotePort);
-                await ExecuteCommandAsync("Set the integration time");
+                ExecuteCommandAsync("Set the integration time");
 
                 _logger.Log("Detector: Prepared for use");
             }
@@ -41,12 +44,12 @@ namespace TestStandApp.Buisness.Equipment
             }
         }
 
-        public void TurnOff()
+        public void TurnOffDetector()
         {
             _lanConnection.ClosePorts();
         }
 
-        public async Task<byte[]?> ExecuteCommandAsync(string command)
+        public byte[] ExecuteCommandAsync(string command)
         {
             try
             {
@@ -68,7 +71,7 @@ namespace TestStandApp.Buisness.Equipment
             }
         }
 
-        public async Task StartScan(string address,
+        public void StartScan(string address,
             int localPort,
             int remotePort)
         {
@@ -76,10 +79,10 @@ namespace TestStandApp.Buisness.Equipment
             {
                 if (_lanConnection.TcpClient == null || _lanConnection.UdpReceiver == null)
                 {
-                    await PrepareForUseAsync(address, localPort, remotePort);
+                    PrepareForUse(address, localPort, remotePort);
                     _logger.Log("Prepared for use.");
                 }
-                await ExecuteCommandAsync("Start scan");
+                ExecuteCommandAsync("Start scan");
             }
             catch (Exception ex)
             {
@@ -88,15 +91,27 @@ namespace TestStandApp.Buisness.Equipment
         }
 
         public async Task<byte[]> ScanAsync(
+            string address,
+            int localPort,
+            int remotePort,
             int imageWidth,
             int imageHeight)
         {
+            Task? writeBytesForChannel = null;
             try
             {
+                if (_lanConnection.TcpClient == null || _lanConnection.UdpReceiver == null)
+                {
+                    PrepareForUse(address, localPort, remotePort);
+                    _logger.Log("Prepared for use.");
+                }
+
                 int packets = imageWidth * 2;
 
                 _logger.Log("Receiving");
 
+                _channelForReadBytes = Channel.CreateUnbounded<byte[]>();
+                writeBytesForChannel = Task.Run(() => { WriteBytesIntoChannelAsync(packets); });
                 byte[] rawBytes = await GetBytesAsync(packets, imageHeight);
 
                 _logger.Log("Scan OK");
@@ -106,14 +121,16 @@ namespace TestStandApp.Buisness.Equipment
             {
                 throw new Exception($"Scan: " + ex.Message);
             }
+
         }
+
 
         public async Task StopScan()
         {
             try
             {
                 _logger.Log("Scan OK");
-                await ExecuteCommandAsync("Stop scan");
+                ExecuteCommandAsync("Stop scan");
             }
             catch (Exception ex)
             {
@@ -125,7 +142,6 @@ namespace TestStandApp.Buisness.Equipment
         {
             int packetsRow = 0;
             int imageArrayNumber = 0;
-            Task writeBytesForChannel = WriteBytesIntoChannel(packets);
 
             byte[] imageArrayByte = new byte[(packets * imageHeight)];
             int position = 0;
@@ -172,18 +188,15 @@ namespace TestStandApp.Buisness.Equipment
                 }
                 catch (Exception ex)
                 {
-                    writeBytesForChannel.Dispose();
-                    await ExecuteCommandAsync("Stop scan");
+                    ExecuteCommandAsync("Stop scan");
                     throw new Exception("Getting bytes: " + ex.Message);
                 }
             }
-            writeBytesForChannel.Dispose();
             return imageArrayByte;
         }
 
-        private async Task WriteBytesIntoChannel(int packets)
+        private async Task WriteBytesIntoChannelAsync(int packets)
         {
-            _channelForReadBytes = Channel.CreateUnbounded<byte[]>();
             byte checkingBytes = 0;
             byte[] preparedBytes;
             while (checkingBytes != packets)

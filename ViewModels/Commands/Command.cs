@@ -5,9 +5,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
-namespace TestStandApp.Infrastructure.Commands
+namespace TestStandApp.ViewModels.Commands
 {
-    internal abstract class Command
+    internal abstract class Command : ICommand
     {
         public event EventHandler CanExecuteChanged
         {

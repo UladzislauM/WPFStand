@@ -16,4 +16,8 @@
     <PackageReference Include="WPFToolkits" Version="3.5.50211.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Infrastructure\" />
+  </ItemGroup>
+
 </Project>

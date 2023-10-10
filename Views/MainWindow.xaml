@@ -1,11 +1,7 @@
 ﻿<Window x:Class="TestStandApp.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="clr-namespace:TestStandApp.ViewModels.Notifications" 
         Title="MainWindow" Height="750" Width="1200">
-    <Window.DataContext>
-        <vm:StandViewModel/>
-    </Window.DataContext>
 
     <Window.Resources>
         <Style x:Key="ImageBorderStyle" TargetType="Border">
@@ -64,7 +60,6 @@
                         Width="89" Height="25"
                         Command="{Binding ExecuteStartScan}"/>
                     <Button Content="Stop scan"
-                        x:Name="stopMoving"
                         HorizontalAlignment="Left" 
                         Margin="10,40,0,0"
                         VerticalAlignment="Top"
@@ -73,12 +68,26 @@
                 </Grid>
             </TabItem>
             <TabItem Header="Stand">
-                <Button Content="Start scenario"
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Content="Start scenario"
                     HorizontalAlignment="Left" 
                     Margin="10,10,0,0"
                     VerticalAlignment="Top"
                     Width="89" Height="25"
                     Command="{Binding ExecuteStartScenario}"/>
+                <Button Content="Stop scenario"
+                    HorizontalAlignment="Left" 
+                    Margin="10,45,0,0"
+                    VerticalAlignment="Top"
+                    Width="89" Height="25"
+                    Command="{Binding ExecuteStopScenario}"/>
+                </Grid>
             </TabItem>
         </TabControl>
     </DockPanel>

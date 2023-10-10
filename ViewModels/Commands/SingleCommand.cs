@@ -5,29 +5,28 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
-namespace TestStandApp.Infrastructure.Commands
+namespace TestStandApp.ViewModels.Commands
 {
-    internal class SingleCommand : ICommand
+    internal class SingleCommand : Command
     {
         private readonly Action<object> _execute;
         private readonly Func<object?, bool>? _canExecute;
 
         public SingleCommand(Action<object?> execute, Func<object?, bool>? canExecute = null)
         {
-            this._execute = execute;
-            this._canExecute = canExecute;
+            _execute = execute;
+            _canExecute = canExecute;
         }
 
-        public bool CanExecute(object? parameter)
+        public override bool CanExecute(object? parameter)
         {
-            //return _canExecute == null || _canExecute(parameter);
-            throw new NotImplementedException();
+            return _canExecute == null || _canExecute(parameter);
+            //throw new NotImplementedException();
         }
 
-        public async void Execute(object? parameter)
+        public override async void Execute(object? parameter)
         {
-            //await ExecuteAsync(parameter);
-            throw new NotSupportedException();
+            _execute(parameter ?? "Empty parameter");
         }
 
         public event EventHandler? CanExecuteChanged

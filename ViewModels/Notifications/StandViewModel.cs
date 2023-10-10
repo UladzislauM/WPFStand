@@ -16,35 +16,45 @@ using System.Windows.Media.Imaging;
 using System.Xml.Linq;
 using TestStandApp.Buisness.Equipment;
 using TestStandApp.Connections;
-using TestStandApp.Infrastructure.Commands;
+using TestStandApp.ViewModels.Commands;
+using TestStandApp.Buisness;
+using System.Linq;
 
 namespace TestStandApp.ViewModels.Notifications
 {
     internal class StandViewModel : MainViewModel
     {
         private bool _isStartScan;
+        private bool _isStartScenario;
+        private string _selectedSerialPortBelt = "COM12";
+        private string _selectedSerialPortGenerator = "COM14";
         private int _selectedLocalSerialPortDetector = 4001;
         private int _selectedRemoteSerialPortDetector = 3000;
         private string _selectedAddressDetector = "127.0.0.1";
-        private int _selectedImageWidth = 20;
-        private int _selectedImageHeight = 704;
+        private string _selectedPath = "D:\\Vlad_doc\\ADVIN\\ResponceImages\\output_image.jpg";
+        private int _partImageWidth = 20;
+        private int _partImageHeight = 704;
         private double _offsetX;
         private byte _checkingBytes;
         private Detector _detector;
+        private Scenario _scenario;
         private ConsoleLogger _logger = new ConsoleLogger();
         private Channel<byte[]> _channelForPackets;
         public SingleCommandAsync ExecuteStartScan { get; private set; }
         public SingleCommand ExecuteStopScan { get; private set; }
-        public SingleCommand ExecuteStartScenario { get; private set; }
+        public SingleCommandAsync ExecuteStartScenario { get; private set; }
+        public SingleCommand ExecuteStopScenario { get; private set; }
 
         private ObservableCollection<ImageSource> _imageCollection;
 
-        public StandViewModel()
+        public StandViewModel(Detector detector, Scenario scenario)
         {
             ExecuteStartScan = new SingleCommandAsync(ExecuteStartScanCommandAsync, CanExecute);
             ExecuteStopScan = new SingleCommand(ExecuteStopScanCommand, CanExecute);
-            ExecuteStartScenario = new SingleCommand(ExecuteStartScenarioCommand, CanExecute);
-            _detector = new Detector(new LanConnection(_logger), _logger);
+            ExecuteStartScenario = new SingleCommandAsync(ExecuteStartScenarioCommandAsync, CanExecute);
+            ExecuteStopScenario = new SingleCommand(ExecuteStopScenarioCommand, CanExecute);
+            _detector = detector;
+            _scenario = scenario;
             _imageCollection = new ObservableCollection<ImageSource>();
         }
 
@@ -71,16 +81,6 @@ namespace TestStandApp.ViewModels.Notifications
             }
         }
 
-        private void MoveItemsLeft()
-        {
-            OffsetX -= _selectedImageWidth / 2;
-        }
-
-        public void AddImage(ImageSource image)
-        {
-            ImageCollection.Add(image);
-        }
-
         public ObservableCollection<ImageSource> ImageCollection
         {
             get => _imageCollection;
@@ -91,28 +91,46 @@ namespace TestStandApp.ViewModels.Notifications
             }
         }
 
+        private void MoveItemsLeft()
+        {
+            OffsetX -= _partImageWidth / 2;
+        }
+
+        public void AddImage(ImageSource image)
+        {
+            ImageCollection.Add(image);
+        }
+
         public void ExecuteStopScanCommand(object parameter)
         {
             _isStartScan = false;
         }
-        
+
         public async Task ExecuteStartScanCommandAsync()
+        {
+            _isStartScan = true;
+            await ScanToViewAsync();
+        }
+
+        private async Task ScanToViewAsync()
         {
             try
             {
-                _isStartScan = true;
                 ImageCollection.Clear();
                 OffsetX = 0;
                 _checkingBytes = 0;
 
-                await _detector.StartScan(
+                _detector.StartScan(
                     _selectedAddressDetector,
                     _selectedLocalSerialPortDetector,
                     _selectedRemoteSerialPortDetector);
                 //byte checkingBytes = 0;
                 byte stop = 250;
 
-                Task writeBytes = WriteBytesToChannel(stop);
+                _channelForPackets = Channel.CreateUnbounded<byte[]>();
+                Task writeBytes = Task.Run(() => { WriteBytesToChannel(stop); });
+
+                await Task.Delay(300);
 
                 byte[] bytesFromChannel;
 
@@ -123,7 +141,7 @@ namespace TestStandApp.ViewModels.Notifications
                     if (_isStartScan)
                     {
                         bytesFromChannel = await _channelForPackets.Reader.ReadAsync();
-                        imageSource = LoadImageFromBytes(bytesFromChannel);
+                        imageSource = Extentions.LoadImageFromBytes(bytesFromChannel, _partImageWidth, _partImageHeight);
 
                         Application.Current.Dispatcher.Invoke(() =>
                         {
@@ -154,21 +172,48 @@ namespace TestStandApp.ViewModels.Notifications
             }
         }
 
-        public void ExecuteStartScenarioCommand(object parameter)
+        public async Task ExecuteStartScenarioCommandAsync()
         {
-            _isStartScan = false;
+            _isStartScenario = true;
+            try
+            {
+                while (_isStartScenario)
+                {
+                    Console.WriteLine("Ready for button");
+                    await _scenario.RunScenarioAsync(
+                                _selectedSerialPortBelt,
+                                _selectedSerialPortGenerator,
+                                _selectedLocalSerialPortDetector,
+                                _selectedRemoteSerialPortDetector,
+                                _selectedAddressDetector,
+                                _partImageWidth,
+                                _partImageHeight,
+                                _selectedPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Stand program: " + ex.Message);
+            }
+        }
+
+        private void ExecuteStopScenarioCommand(object parameter)
+        {
+            _isStartScenario = false;
         }
 
         private async Task WriteBytesToChannel(byte stop)
         {
-            _channelForPackets = Channel.CreateUnbounded<byte[]>();
             byte checkingBytes = 0;
             byte[] preparedBytes;
             while (checkingBytes != stop)
             {
                 preparedBytes = await _detector.ScanAsync(
-                _selectedImageWidth,
-                _selectedImageHeight);
+                    _selectedAddressDetector,
+                    _selectedLocalSerialPortDetector,
+                    _selectedRemoteSerialPortDetector,
+                    _partImageWidth,
+                    _partImageHeight);
 
                 await _channelForPackets.Writer.WriteAsync(preparedBytes);
 
@@ -179,35 +224,6 @@ namespace TestStandApp.ViewModels.Notifications
         private bool CanExecute(object parameter)
         {
             return true;
-        }
-
-        public ImageSource LoadImageFromBytes(byte[] imageBytes)
-        {
-            try
-            {
-                if (imageBytes == null || imageBytes.Length == 0)
-                {
-                    throw new Exception("Load image from bytes: Empty bytes");
-                }
-
-                int width = _selectedImageWidth;
-                int height = _selectedImageHeight;
-                PixelFormat format = PixelFormats.Gray16;
-
-                WriteableBitmap writeableBitmap = new WriteableBitmap(width,
-                   height, 96, 96, format, null);
-                Int32Rect rect = new Int32Rect(0, 0, width, height);
-                int stride = (width * format.BitsPerPixel + 7) / 8;
-
-                writeableBitmap.WritePixels(rect, imageBytes, stride, 0);
-
-                return writeableBitmap;
-
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Load image from bytes: " + ex.Message);
-            }
         }
     }
 }

@@ -2,9 +2,9 @@
 using System.Threading.Tasks;
 using System.Windows.Input;
 
-namespace TestStandApp.Infrastructure.Commands
+namespace TestStandApp.ViewModels.Commands
 {
-    internal class SingleCommandAsync : ICommand
+    internal class SingleCommandAsync : Command
     {
         private readonly Func<Task> _executeAsync;
         private readonly Func<object?, bool>? _canExecute;
@@ -15,16 +15,16 @@ namespace TestStandApp.Infrastructure.Commands
             _canExecute = canExecute;
         }
 
-        public bool CanExecute(object? parameter)
+        public override bool CanExecute(object? parameter)
         {
-            //return _canExecute == null || _canExecute(parameter);
-            throw new NotImplementedException();
+            return _canExecute == null || _canExecute(parameter);
+            //throw new NotImplementedException();
         }
 
-        public void Execute(object? parameter)
+        public override async void Execute(object? parameter)
         {
-            //await ExecuteAsync(parameter);
-            throw new NotSupportedException();
+            await ExecuteAsync(parameter);
+            //throw new NotSupportedException();
         }
 
         public async Task ExecuteAsync(object? parameter)
