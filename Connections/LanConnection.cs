@@ -1,12 +1,8 @@
 ﻿using SixLabors.ImageSharp.Formats.Jpeg;
-using StandConsoleApp.Buisness.Logger;
+using TestStandApp.Buisness.Logger;
 using System;
-using System.IO.Ports;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace TestStandApp.Connections
 {
@@ -16,8 +12,7 @@ namespace TestStandApp.Connections
         public UdpClient UdpReceiver;
         public TcpClient TcpClient;
         private NetworkStream _stream;
-        private UdpReceiveResult _udpReceiveResult;
-        CancellationTokenSource _cancellationTokenSource;
+        private IPEndPoint _ipEndPoint;
 
         private readonly ILogger _logger;
 
@@ -33,6 +28,7 @@ namespace TestStandApp.Connections
                 IPAddress ipAddress = IPAddress.Parse(address);
                 UdpReceiver = new UdpClient(localPort);
                 TcpClient = new TcpClient(address, remotePort);
+                _ipEndPoint = new IPEndPoint(ipAddress, localPort);
                 _stream = TcpClient.GetStream();
             }
             catch (Exception ex)
@@ -53,7 +49,7 @@ namespace TestStandApp.Connections
             }
         }
 
-        public async Task<byte[]> ExecuteCommandAsync(byte[] data)
+        public byte[] ExecuteCommand(byte[] data)
         {
             byte[] readData = new byte[16];
             try
@@ -69,18 +65,12 @@ namespace TestStandApp.Connections
             return readData;
         }
 
-        public async Task<byte[]> ReceiveAMessageAsync()
+        public byte[] ReceiveAMessage()
         {
             try
             {
-                _cancellationTokenSource = new CancellationTokenSource();
-                _cancellationTokenSource.CancelAfter(ReceivingTimeout);
-                _udpReceiveResult = await UdpReceiver.ReceiveAsync(_cancellationTokenSource.Token);
-                return _udpReceiveResult.Buffer;
-            }
-            catch (OperationCanceledException operationException)
-            {
-                throw new Exception("Receiving message: Temeout receiving.");
+                byte[] receiveResualt = UdpReceiver.Receive(ref _ipEndPoint);
+                return receiveResualt;
             }
             catch (Exception ex)
             {
