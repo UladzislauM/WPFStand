@@ -93,7 +93,7 @@ namespace TestStandApp.Buisness.Equipment
                 for (byte i = 1; i < 4; i++)
                 {
 
-                    BitArray exceptionBitesPlatform = Extentions.ByteForBites(exceptionBytesPlatform, i);
+                    BitArray exceptionBitesPlatform = MyExtensions.ByteForBites(exceptionBytesPlatform, i);
 
                     for (byte k = 0; k < 7; k++)
                     {
@@ -106,7 +106,7 @@ namespace TestStandApp.Buisness.Equipment
 
                 byte[] readStatusBelt = await CheckStatusPLCAsync();
                 StartCheckStatus = true;
-                BitArray statusBites = Extentions.ByteForBites(readStatusBelt, 2);
+                BitArray statusBites = MyExtensions.ByteForBites(readStatusBelt, 2);
 
                 if (statusBites[1])
                 {
@@ -169,7 +169,7 @@ namespace TestStandApp.Buisness.Equipment
         private async Task MoveForwardAsync()
         {
             byte[] readStatusBelt = await CheckStatusPLCAsync();
-            BitArray statusBites = Extentions.ByteForBites(readStatusBelt, 2);
+            BitArray statusBites = MyExtensions.ByteForBites(readStatusBelt, 2);
 
             if (statusBites[0])
             {
@@ -192,7 +192,7 @@ namespace TestStandApp.Buisness.Equipment
         private async Task MoveBackAsync()
         {
             byte[] readStatusBelt = await CheckStatusPLCAsync();
-            BitArray statusBites = Extentions.ByteForBites(readStatusBelt, 2);
+            BitArray statusBites = MyExtensions.ByteForBites(readStatusBelt, 2);
 
             if (statusBites[1])
             {
@@ -215,13 +215,13 @@ namespace TestStandApp.Buisness.Equipment
         private async Task CheckTheEndOfTheMovementAsync(byte bitNumber)
         {
             byte[] readStatusBelt = await CheckStatusPLCAsync();
-            BitArray statusBites = Extentions.ByteForBites(readStatusBelt, 2);
+            BitArray statusBites = MyExtensions.ByteForBites(readStatusBelt, 2);
 
             byte checkMovePlatform = 0;
             while (!statusBites[bitNumber])
             {
                 readStatusBelt = await CheckStatusPLCAsync();
-                statusBites = Extentions.ByteForBites(readStatusBelt, 2);
+                statusBites = MyExtensions.ByteForBites(readStatusBelt, 2);
                 if (checkMovePlatform == 12)
                 {
                     throw new Exception("Belt situated on the previous position");

@@ -4,6 +4,9 @@ using TestStandApp.Connections;
 using System.Threading.Tasks;
 using System;
 using TestStandApp.Buisness.Equipment;
+using System.Threading.Channels;
+using System.Windows.Media;
+using System.Windows;
 
 namespace TestStandApp.Buisness
 {
@@ -16,6 +19,9 @@ namespace TestStandApp.Buisness
         private readonly Button _button;
         private readonly Detector _detector;
         bool _isRunPlatform;
+        private Channel<byte[]> _channelForPackets;
+        public event Action<byte[]> ImageBytesReceived;
+        public event Action<double> ImageOffsetReceived;
 
         public Scenario(ILogger logger,
             Belt belt,
@@ -39,8 +45,7 @@ namespace TestStandApp.Buisness
             int detectorRemotePort,
             string detectorAddress,
             int imageWidth,
-            int imageHeight,
-            string path)
+            int imageHeight)
         {
 
             try
@@ -58,17 +63,21 @@ namespace TestStandApp.Buisness
 
                     _logger.Log("Step 2");
 
-                    Task checkingScanSensor = StartScanAsync(generatorPort,
-                                                        detectorLocalPort,
-                                                        detectorRemotePort,
-                                                        detectorAddress,
-                                                        imageWidth,
-                                                        imageHeight,
-                                                        path);
+                    Task.Run(() =>
+                    {
+                        StartScanAsync(generatorPort,
+                                       detectorLocalPort,
+                                       detectorRemotePort,
+                                       detectorAddress,
+                                       imageWidth,
+                                       imageHeight);
+                    });
 
                     await _belt.MovingTheBeltAsync(beltPort, true);
 
                     _logger.Log("Step 3");
+
+                    MyExtensions.IsStartScan = false;
 
                     await _belt.MovingTheBeltAsync(beltPort, false);
                     _logger.Log("Step 4");
@@ -85,7 +94,7 @@ namespace TestStandApp.Buisness
                 _isRunPlatform = false;
                 _belt.IsEndScenario = true;
                 _belt.ShutDownConnectionToBelt();
-                _detector.TurnOffDetector();
+                _detector.TurnOffDetector();//TODO
             }
         }
 
@@ -95,8 +104,7 @@ namespace TestStandApp.Buisness
             int detectorRemotePort,
             string detectorAddress,
             int imageWidth,
-            int imageHeight,
-            string path)
+            int imageHeight)
         {
             bool startScan = await CheckScanSensorAsync();
 
@@ -106,18 +114,113 @@ namespace TestStandApp.Buisness
 
                 _generator.IsWorkGenerator = true;
 
-                Task generatorWorkTask = _generator.StartAsync(generatorPort);//TODO mb better stop the belt before start scan
+                Task generatorWorkTask = Task.Run(() =>
+                {
+                    _generator.StartAsync(generatorPort);//TODO mb better stop the belt before start scan
+                });
 
                 await _shutter.TurnOnAsync();
 
-                byte[] preparedBytes = await _detector.ScanAsync(detectorAddress, detectorLocalPort, detectorRemotePort, imageWidth, imageHeight);
-
-                _detector.SavePicture(preparedBytes, imageWidth, imageHeight, path);
+                await ScanToViewAsync(
+                    detectorLocalPort,
+                    detectorRemotePort,
+                    detectorAddress,
+                    imageWidth,
+                    imageHeight);
 
                 _generator.IsWorkGenerator = false;
-                generatorWorkTask.Dispose();
 
                 await _shutter.TurnOffShutterAsync();
+                //generatorWorkTask.Dispose();
+            }
+        }
+
+        public async Task ScanToViewAsync(
+            int detectorLocalPort,
+            int detectorRemotePort,
+            string detectorAddress,
+            int imageWidth,
+            int imageHeight)
+        {
+            try
+            {
+                _detector.StartScan(
+                   detectorAddress,
+                   detectorLocalPort,
+                   detectorRemotePort);
+
+                byte checkingBytes = 0;
+
+                _channelForPackets = Channel.CreateUnbounded<byte[]>();
+                Task writeBytes = Task.Run(() => { WriteBytesToChannel(
+                   detectorAddress,
+                   detectorLocalPort,
+                   detectorRemotePort,
+                   imageWidth,
+                   imageHeight); });
+
+                await Task.Delay(300);
+
+                byte[] bytesFromChannel;
+
+                ImageSource imageSource;
+
+                while (checkingBytes != MyExtensions.StopScanNumber)
+                {
+                    if (MyExtensions.IsStartScan)
+                    {
+                        bytesFromChannel = await _channelForPackets.Reader.ReadAsync();
+
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            ImageBytesReceived.Invoke(bytesFromChannel);
+                        });
+
+                        if (checkingBytes >= 20)
+                        {
+                            ImageOffsetReceived.Invoke(imageWidth);
+                        }
+                        checkingBytes++;
+                    }
+                    else
+                    {
+                        //writeBytes.Dispose();
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Log("Execute: " + ex.Message);
+            }
+            finally
+            {
+                await _detector.StopScan();
+                _channelForPackets.Writer.Complete();
+            }
+        }
+
+        private async Task WriteBytesToChannel(
+            string detectorAddress,
+            int detectorLocalPort,
+            int detectorRemotePort,
+            int imageWidth,
+            int imageHeight)
+        {
+            byte checkingBytes = 0;
+            byte[] preparedBytes;
+            while (checkingBytes != MyExtensions.StopScanNumber)
+            {
+                preparedBytes = await _detector.ScanAsync(
+                   detectorAddress,
+                   detectorLocalPort,
+                   detectorRemotePort,
+                   imageWidth,
+                   imageHeight);
+
+                await _channelForPackets.Writer.WriteAsync(preparedBytes);
+
+                checkingBytes++;
             }
         }
 
@@ -126,13 +229,13 @@ namespace TestStandApp.Buisness
             _logger.Log("Start checking scan sensor");
 
             byte[] readStatusBelt = await _belt.CheckStatusPLCAsync();
-            BitArray statusBites = Extentions.ByteForBites(readStatusBelt, 1);
+            BitArray statusBites = MyExtensions.ByteForBites(readStatusBelt, 1);
 
             while (!statusBites[4])
             {
                 await Task.Delay(20);
                 readStatusBelt = await _belt.CheckStatusPLCAsync();
-                statusBites = Extentions.ByteForBites(readStatusBelt, 1);
+                statusBites = MyExtensions.ByteForBites(readStatusBelt, 1);
             }
             return true;
         }

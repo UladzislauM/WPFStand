@@ -13,5 +13,10 @@ namespace TestStandApp
         {
             scrollViewer.ScrollToRightEnd();
         }
+        
+        private void itemsControlForScenario_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            scrollViewerForScenario.ScrollToRightEnd();
+        }
     }
 }

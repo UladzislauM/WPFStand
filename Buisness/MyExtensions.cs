@@ -8,8 +8,10 @@ using System.Windows;
 
 namespace TestStandApp.Buisness
 {
-    internal static class Extentions
+    internal static class MyExtensions
     {
+        public static bool IsStartScan;
+        public static int StopScanNumber = 86;
         public static BitArray ByteForBites(byte[] writeData, byte testByteNumber)
         {
             if (testByteNumber <= writeData.Length)
@@ -25,7 +27,7 @@ namespace TestStandApp.Buisness
             }
         }
 
-        public static ImageSource LoadImageFromBytes(byte[] imageBytes, int width, int height)
+        public static ImageSource LoadImageFromBytes(byte[] imageBytes, int width, int height) //TODO add extention method
         {
             try
             {

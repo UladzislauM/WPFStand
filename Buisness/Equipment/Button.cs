@@ -28,7 +28,7 @@ namespace TestStandApp.Buisness.Equipment
                 while (true)
                 {
                     readStatusBelt = await _belt.CheckStatusPLCAsync();
-                    BitArray statusBites = Extentions.ByteForBites(readStatusBelt, 1);
+                    BitArray statusBites = MyExtensions.ByteForBites(readStatusBelt, 1);
                     if (statusBites[_keyForStart])
                     {
                         return true;

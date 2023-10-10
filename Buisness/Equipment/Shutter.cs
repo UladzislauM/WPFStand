@@ -19,7 +19,7 @@ namespace TestStandApp.Buisness.Equipment
         {
             byte[] sutterReadBytes = await _belt.ExecuteCommandAsync("Shutter on");
 
-            BitArray shutterBites = Extentions.ByteForBites(sutterReadBytes, 0);
+            BitArray shutterBites = MyExtensions.ByteForBites(sutterReadBytes, 0);
 
             if (!shutterBites[1])
             {
@@ -32,7 +32,7 @@ namespace TestStandApp.Buisness.Equipment
         {
             byte[] sutterReadBytes = await _belt.ExecuteCommandAsync("Shutter off");
 
-            BitArray shutterBites = Extentions.ByteForBites(sutterReadBytes, 0);
+            BitArray shutterBites = MyExtensions.ByteForBites(sutterReadBytes, 0);
 
             if (!shutterBites[2])
             {

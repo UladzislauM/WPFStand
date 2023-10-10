@@ -239,7 +239,7 @@ namespace TestStandApp.Buisness.Equipment
             var finalImage = Image.LoadPixelData<L16>(preparedBytes, imageWidth, imageHeight);
 
             finalImage.Save(path, new JpegEncoder());
-            finalImage.Dispose();
+            //finalImage.Dispose();
             _logger.Log("Saving OK");
         }
 

@@ -1,24 +1,11 @@
 ﻿using TestStandApp.Buisness.Logger;
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Xml.Linq;
-using TestStandApp.Buisness.Equipment;
-using TestStandApp.Connections;
 using TestStandApp.ViewModels.Commands;
 using TestStandApp.Buisness;
-using System.Linq;
 
 namespace TestStandApp.ViewModels.Notifications
 {
@@ -32,14 +19,13 @@ namespace TestStandApp.ViewModels.Notifications
         private int _selectedRemoteSerialPortDetector = 3000;
         private string _selectedAddressDetector = "127.0.0.1";
         private string _selectedPath = "D:\\Vlad_doc\\ADVIN\\ResponceImages\\output_image.jpg";
-        private int _partImageWidth = 20;
+        private int _partImageWidth = 10;
         private int _partImageHeight = 704;
         private double _offsetX;
         private byte _checkingBytes;
-        private Detector _detector;
         private Scenario _scenario;
         private ConsoleLogger _logger = new ConsoleLogger();
-        private Channel<byte[]> _channelForPackets;
+
         public SingleCommandAsync ExecuteStartScan { get; private set; }
         public SingleCommand ExecuteStopScan { get; private set; }
         public SingleCommandAsync ExecuteStartScenario { get; private set; }
@@ -47,15 +33,26 @@ namespace TestStandApp.ViewModels.Notifications
 
         private ObservableCollection<ImageSource> _imageCollection;
 
-        public StandViewModel(Detector detector, Scenario scenario)
+        public StandViewModel(Scenario scenario)
         {
             ExecuteStartScan = new SingleCommandAsync(ExecuteStartScanCommandAsync, CanExecute);
             ExecuteStopScan = new SingleCommand(ExecuteStopScanCommand, CanExecute);
             ExecuteStartScenario = new SingleCommandAsync(ExecuteStartScenarioCommandAsync, CanExecute);
             ExecuteStopScenario = new SingleCommand(ExecuteStopScenarioCommand, CanExecute);
-            _detector = detector;
             _scenario = scenario;
+            _scenario.ImageBytesReceived += _scenarioImageBytesReceived;
+            _scenario.ImageOffsetReceived += _scenarioImageOffsetReceived;
             _imageCollection = new ObservableCollection<ImageSource>();
+        }
+
+        public int StopByte
+        {
+            get => MyExtensions.StopScanNumber;
+            set
+            {
+                MyExtensions.StopScanNumber = value;
+                OnPropertyChanged(nameof(StopByte));
+            }
         }
 
         public double OffsetX
@@ -91,84 +88,56 @@ namespace TestStandApp.ViewModels.Notifications
             }
         }
 
-        private void MoveItemsLeft()
+        private void _scenarioImageOffsetReceived(double offset)
         {
-            OffsetX -= _partImageWidth / 2;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                OffsetX -= offset / 2;
+            });
         }
 
         public void AddImage(ImageSource image)
         {
-            ImageCollection.Add(image);
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                ImageCollection.Add(image);
+            });
         }
 
         public void ExecuteStopScanCommand(object parameter)
         {
-            _isStartScan = false;
+            MyExtensions.IsStartScan = false;
         }
 
         public async Task ExecuteStartScanCommandAsync()
         {
-            _isStartScan = true;
-            await ScanToViewAsync();
+            MyExtensions.IsStartScan = true;
+
+            ImageCollection.Clear();
+            OffsetX = 0;
+
+            Task.Run(() =>
+            {
+                _scenario.ScanToViewAsync(
+                _selectedLocalSerialPortDetector,
+                _selectedRemoteSerialPortDetector,
+                _selectedAddressDetector,
+                _partImageWidth,
+                _partImageHeight);
+            });
         }
 
-        private async Task ScanToViewAsync()
+        private void _scenarioImageBytesReceived(byte[] imageBytes)
         {
             try
             {
-                ImageCollection.Clear();
-                OffsetX = 0;
-                _checkingBytes = 0;
+                ImageSource imageSource = MyExtensions.LoadImageFromBytes(imageBytes, _partImageWidth, _partImageHeight);
 
-                _detector.StartScan(
-                    _selectedAddressDetector,
-                    _selectedLocalSerialPortDetector,
-                    _selectedRemoteSerialPortDetector);
-                //byte checkingBytes = 0;
-                byte stop = 250;
-
-                _channelForPackets = Channel.CreateUnbounded<byte[]>();
-                Task writeBytes = Task.Run(() => { WriteBytesToChannel(stop); });
-
-                await Task.Delay(300);
-
-                byte[] bytesFromChannel;
-
-                ImageSource imageSource;
-
-                while (_checkingBytes != stop)
-                {
-                    if (_isStartScan)
-                    {
-                        bytesFromChannel = await _channelForPackets.Reader.ReadAsync();
-                        imageSource = Extentions.LoadImageFromBytes(bytesFromChannel, _partImageWidth, _partImageHeight);
-
-                        Application.Current.Dispatcher.Invoke(() =>
-                        {
-                            AddImage(imageSource);
-                        });
-
-                        if (_checkingBytes >= 20)
-                        {
-                            MoveItemsLeft();
-                        }
-                        CheckingBytes++;
-                    }
-                    else
-                    {
-                        writeBytes.Dispose();
-                        break;
-                    }
-                }
+                AddImage(imageSource);
             }
             catch (Exception ex)
             {
-                _logger.Log("Execute: " + ex.Message);
-            }
-            finally
-            {
-                await _detector.StopScan();
-                _channelForPackets.Writer.Complete();
+                _logger.Log("event scenario image: " + ex.Message);
             }
         }
 
@@ -179,7 +148,8 @@ namespace TestStandApp.ViewModels.Notifications
             {
                 while (_isStartScenario)
                 {
-                    Console.WriteLine("Ready for button");
+                    MyExtensions.IsStartScan = true;
+
                     await _scenario.RunScenarioAsync(
                                 _selectedSerialPortBelt,
                                 _selectedSerialPortGenerator,
@@ -187,38 +157,19 @@ namespace TestStandApp.ViewModels.Notifications
                                 _selectedRemoteSerialPortDetector,
                                 _selectedAddressDetector,
                                 _partImageWidth,
-                                _partImageHeight,
-                                _selectedPath);
+                                _partImageHeight);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Stand program: " + ex.Message);
+                _logger.Log("Stand program: " + ex.Message);
             }
         }
 
         private void ExecuteStopScenarioCommand(object parameter)
         {
             _isStartScenario = false;
-        }
-
-        private async Task WriteBytesToChannel(byte stop)
-        {
-            byte checkingBytes = 0;
-            byte[] preparedBytes;
-            while (checkingBytes != stop)
-            {
-                preparedBytes = await _detector.ScanAsync(
-                    _selectedAddressDetector,
-                    _selectedLocalSerialPortDetector,
-                    _selectedRemoteSerialPortDetector,
-                    _partImageWidth,
-                    _partImageHeight);
-
-                await _channelForPackets.Writer.WriteAsync(preparedBytes);
-
-                checkingBytes++;
-            }
+            MyExtensions.IsStartScan = false;
         }
 
         private bool CanExecute(object parameter)

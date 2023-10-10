@@ -65,6 +65,9 @@
                         VerticalAlignment="Top"
                         Width="89" Height="25"
                         Command="{Binding ExecuteStopScan}"/>
+                    <TextBox Margin="10,77,1095,0"
+                        VerticalAlignment="Top"
+                        Text="{Binding StopByte}"/>
                 </Grid>
             </TabItem>
             <TabItem Header="Stand">
@@ -75,6 +78,24 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
+                    <Border Style="{StaticResource ImageBorderStyle}" Margin="0,0,0,0">
+    <ScrollViewer x:Name="scrollViewerForScenario" VerticalScrollBarVisibility="Disabled" HorizontalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding ImageCollection}" SizeChanged="itemsControlForScenario_SizeChanged" x:Name="itemsControlForScenario" HorizontalAlignment="Right">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" Height="Auto">
+                    </WrapPanel>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Image Source="{Binding}" Margin="-1,0,0,0"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </ScrollViewer>
+</Border>
                     <Button Content="Start scenario"
                     HorizontalAlignment="Left" 
                     Margin="10,10,0,0"
@@ -87,6 +108,9 @@
                     VerticalAlignment="Top"
                     Width="89" Height="25"
                     Command="{Binding ExecuteStopScenario}"/>
+                <TextBox Margin="10,77,1095,0"
+                    VerticalAlignment="Top"
+                    Text="{Binding StopByte}"/>
                 </Grid>
             </TabItem>
         </TabControl>
