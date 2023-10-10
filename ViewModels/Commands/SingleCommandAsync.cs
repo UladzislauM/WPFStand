@@ -1,20 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace TestStandApp.ViewModels.Commands
 {
-    internal class SingleCommand : Command
+    internal class SingleCommandAsync : Command
     {
-        private readonly Action<object> _execute;
+        private readonly Func<Task> _executeAsync;
         private readonly Func<object?, bool>? _canExecute;
 
-        public SingleCommand(Action<object?> execute, Func<object?, bool>? canExecute = null)
+        public SingleCommandAsync(Func<Task> executeAsync, Func<object?, bool>? canExecute = null)
         {
-            _execute = execute;
+            _executeAsync = executeAsync ?? throw new ArgumentNullException(nameof(executeAsync));
             _canExecute = canExecute;
         }
 
@@ -26,7 +23,16 @@ namespace TestStandApp.ViewModels.Commands
 
         public override async void Execute(object? parameter)
         {
-            _execute(parameter ?? "Empty parameter");
+            await ExecuteAsync(parameter);
+            //throw new NotSupportedException();
+        }
+
+        public async Task ExecuteAsync(object? parameter)
+        {
+            if (CanExecute(parameter))
+            {
+                await _executeAsync();
+            }
         }
 
         public event EventHandler? CanExecuteChanged

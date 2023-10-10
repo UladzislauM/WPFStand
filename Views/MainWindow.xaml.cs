@@ -1,29 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO.Ports;
-using System.Linq;
-using System.Text;
-using System.Windows;
-using System.Windows.Input;
-using TestStandApp.ViewModels.Notifications;
+﻿using System.Windows;
 
 namespace TestStandApp
 {
     public partial class MainWindow : Window
     {
-        private StandViewModel viewModel;
-
         public MainWindow()
         {
             InitializeComponent();
-            viewModel = new StandViewModel();
-            DataContext = viewModel;
-            Closed += MainWindow_Closed;
         }
 
-        private void MainWindow_Closed(object sender, EventArgs e)
+        private void itemsControl_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            viewModel.ClosePort();
+            scrollViewer.ScrollToRightEnd();
+        }
+        
+        private void itemsControlForScenario_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            scrollViewerForScenario.ScrollToRightEnd();
         }
     }
 }
